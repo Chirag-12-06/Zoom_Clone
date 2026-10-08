@@ -1,4 +1,4 @@
-import type { Meeting, RecentMeeting, User } from "./types";
+import type { Meeting, MeetingPublic, RecentMeeting, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -30,3 +30,7 @@ export const getMe = () => request<User>("/api/me");
 export const getUpcomingMeetings = () => request<Meeting[]>("/api/meetings/upcoming");
 
 export const getRecentMeetings = () => request<RecentMeeting[]>("/api/meetings/recent");
+
+export const createInstantMeeting = () => request<Meeting>("/api/meetings/instant", { method: "POST" });
+
+export const getMeeting = (code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
