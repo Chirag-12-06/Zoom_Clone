@@ -196,6 +196,8 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
         onToggleVideo={toggleVideo}
         onToggleParticipants={() => setParticipantsOpen((open) => !open)}
         onLeave={leave}
+        isHost={socket.isHost}
+        onEndMeeting={socket.endMeeting}
       />
     </div>
   );
