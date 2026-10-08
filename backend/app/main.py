@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import models  # noqa: F401  (registers the tables on Base.metadata)
 from app.database import Base, SessionLocal, engine
-from app.routers import meetings, users
+from app.routers import meetings, users, ws
 from app.seed import seed_default_user
 
 
@@ -29,6 +29,7 @@ app.add_middleware(
 
 app.include_router(users.router)
 app.include_router(meetings.router)
+app.include_router(ws.router)
 
 
 @app.get("/api/health")
