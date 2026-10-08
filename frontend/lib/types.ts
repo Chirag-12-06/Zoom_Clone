@@ -31,3 +31,12 @@ export type MeetingPublic = {
   host_name: string;
   has_ended: boolean;
 };
+
+/** Someone in the meeting room, as shown in the video grid and participants panel */
+export type Participant = {
+  id: number;
+  display_name: string;
+  is_host: boolean;
+  audio: boolean; // mic on
+  video: boolean; // camera on
+};
