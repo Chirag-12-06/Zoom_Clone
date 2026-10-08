@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -11,9 +12,10 @@ router = APIRouter()
 
 # Custom close codes (4000-4999 are reserved for applications)
 CLOSE_CANNOT_JOIN = 4001
+CLOSE_REMOVED = 4003
 CLOSE_MEETING_ENDED = 4004
 
-HOST_COMMANDS = {"mute_all", "end_meeting"}
+HOST_COMMANDS = {"mute_all", "remove_participant", "end_meeting"}
 
 
 async def reject(websocket: WebSocket, message: str) -> None:
@@ -28,6 +30,36 @@ async def mute_all(code: str, host: Connection) -> None:
         connection.audio = False
         await manager.send(connection, {"type": "force_mute"})  # their browser turns the mic off
         await manager.broadcast(code, {"type": "participant_updated", "participant": connection.to_dict()})
+
+
+def was_removed(db: Session, meeting: Meeting, display_name: str) -> bool:
+    # There are no accounts for guests, so the display name is the only identity we have:
+    # someone the host removed can't come back under the same name (case-insensitive).
+    return db.scalar(
+        select(Participant.id)
+        .where(
+            Participant.meeting_id == meeting.id,
+            Participant.removed.is_(True),
+            func.lower(Participant.display_name) == display_name.lower(),
+        )
+        .limit(1)
+    ) is not None
+
+
+async def remove_participant(db: Session, code: str, host: Connection, participant_id: object) -> None:
+    # participant_id comes straight from client JSON, so check it really is an int
+    target = manager.get(code, participant_id) if isinstance(participant_id, int) else None
+    if target is None or target is host:
+        await manager.send(host, {"type": "error", "message": "Participant not found"})
+        return
+    db.get(Participant, participant_id).removed = True
+    db.commit()
+    await manager.send(target, {"type": "removed"})
+    try:
+        # Their own handler sees the disconnect and broadcasts participant_left
+        await target.websocket.close(code=CLOSE_REMOVED)
+    except Exception:
+        pass
 
 
 async def end_meeting(db: Session, meeting: Meeting, code: str) -> None:
@@ -56,6 +88,9 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
         await reject(websocket, exc.detail)
         return
     except WebSocketDisconnect:
+        return
+    if was_removed(db, meeting, join.display_name):
+        await reject(websocket, "You were removed from this meeting")
         return
 
     # 2. Record the attendance and start the meeting if this is the first person in
@@ -108,6 +143,8 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
                 await websocket.send_json({"type": "error", "message": "Only the host can do that"})
             elif kind == "mute_all":
                 await mute_all(code, connection)
+            elif kind == "remove_participant":
+                await remove_participant(db, code, connection, message.get("participant_id"))
             elif kind == "end_meeting":
                 await end_meeting(db, meeting, code)
                 break  # our own socket was closed too

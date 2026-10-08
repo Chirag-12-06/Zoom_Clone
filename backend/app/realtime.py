@@ -46,6 +46,9 @@ class ConnectionManager:
     def roster(self, code: str) -> list[dict]:
         return [connection.to_dict() for connection in self.rooms.get(code, {}).values()]
 
+    def get(self, code: str, participant_id: int) -> Connection | None:
+        return self.rooms.get(code, {}).get(participant_id)
+
     def connections(self, code: str) -> list[Connection]:
         # A copy, so the room can change while the caller is awaiting sends
         return list(self.rooms.get(code, {}).values())

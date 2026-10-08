@@ -154,3 +154,38 @@ def test_end_meeting_disconnects_everyone_and_blocks_joins(client, meeting, db_s
     with client.websocket_connect(ws_url(meeting)) as late:
         late.send_json(join_message(meeting))
         assert late.receive_json()["message"] == "This meeting has ended"
+
+
+def test_host_removes_participant_who_cannot_rejoin_under_that_name(client, meeting, db_session):
+    with client.websocket_connect(ws_url(meeting)) as host:
+        with client.websocket_connect(ws_url(meeting)) as guest:
+            guest_id = join_pair(client, meeting, host, guest)
+            host.send_json({"type": "remove_participant", "participant_id": guest_id})
+
+            assert guest.receive_json() == {"type": "removed"}
+            with pytest.raises(WebSocketDisconnect) as closed:
+                guest.receive_json()
+            assert closed.value.code == 4003
+        # The test client confirms the close when its "with" block exits (a browser does it
+        # immediately); only then does the guest's handler run its cleanup and tell the host
+        assert host.receive_json() == {"type": "participant_left", "participant_id": guest_id}
+
+    assert db_session.get(Participant, guest_id).removed is True
+
+    with client.websocket_connect(ws_url(meeting)) as again:
+        again.send_json(join_message(meeting, name="ASHA"))
+        assert again.receive_json()["message"] == "You were removed from this meeting"
+    with client.websocket_connect(ws_url(meeting)) as other:
+        other.send_json(join_message(meeting, name="Ravi"))
+        assert other.receive_json()["type"] == "welcome"
+
+
+def test_remove_rejects_bad_targets_and_guests(client, meeting):
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        guest_id = join_pair(client, meeting, host, guest)
+        for bad in (12345, "1", None):
+            host.send_json({"type": "remove_participant", "participant_id": bad})
+            assert host.receive_json() == {"type": "error", "message": "Participant not found"}
+
+        guest.send_json({"type": "remove_participant", "participant_id": guest_id})
+        assert guest.receive_json() == {"type": "error", "message": "Only the host can do that"}
