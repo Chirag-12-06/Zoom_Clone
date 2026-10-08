@@ -52,7 +52,7 @@ export default function DashboardPage() {
       <main className="mx-auto grid w-full max-w-6xl flex-1 content-start gap-10 px-4 py-10 lg:grid-cols-2">
         <section className="flex min-w-0 flex-col gap-10">
           <div className="py-6">
-            <ActionTiles onNewMeeting={handleNewMeeting} />
+            <ActionTiles onNewMeeting={handleNewMeeting} onJoin={() => router.push("/join")} />
           </div>
           <div>
             <h2 className="mb-3 text-sm font-semibold text-gray-700">Recent meetings</h2>

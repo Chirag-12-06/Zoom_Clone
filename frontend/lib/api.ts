@@ -34,3 +34,10 @@ export const getRecentMeetings = () => request<RecentMeeting[]>("/api/meetings/r
 export const createInstantMeeting = () => request<Meeting>("/api/meetings/instant", { method: "POST" });
 
 export const getMeeting = (code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
+
+/** Checks the meeting exists, the passcode is right and it hasn't ended. Throws ApiError otherwise. */
+export const checkJoin = (code: string, passcode: string, displayName: string) =>
+  request<MeetingPublic>(`/api/meetings/${code}/join`, {
+    method: "POST",
+    body: JSON.stringify({ passcode, display_name: displayName }),
+  });
