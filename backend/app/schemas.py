@@ -89,3 +89,12 @@ class MeetingPublic(BaseModel):
 class JoinRequest(BaseModel):
     passcode: NonBlankStr
     display_name: Annotated[NonBlankStr, Field(max_length=50)]
+
+
+class JoinMessage(JoinRequest):
+    """First message a client sends on the meeting WebSocket."""
+
+    type: Literal["join"]
+    user_id: int | None = None  # sent only by the host; matched against meeting.host_id
+    audio: bool = True
+    video: bool = True

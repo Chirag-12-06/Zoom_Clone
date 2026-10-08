@@ -11,11 +11,9 @@ import PreJoin from "@/components/meeting/PreJoin";
 import Toolbar from "@/components/meeting/Toolbar";
 import VideoGrid from "@/components/meeting/VideoGrid";
 import { useLocalMedia } from "@/hooks/useLocalMedia";
+import { useMeetingSocket } from "@/hooks/useMeetingSocket";
 import { ApiError, getMe, getMeeting } from "@/lib/api";
 import type { MeetingPublic, Participant } from "@/lib/types";
-
-// Until the live roster arrives over WebSocket, the only participant is the local user
-const SELF_ID = 0;
 
 type MeetingRoomProps = {
   code: string;
@@ -33,6 +31,18 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
   const [joined, setJoined] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [userId, setUserId] = useState<number | null>(null);
+
+  const socket = useMeetingSocket({
+    // The host must wait for their user id: it's what makes the server treat them as host
+    enabled: joined && (!isHost || userId !== null),
+    code,
+    passcode,
+    displayName: name.trim(),
+    userId,
+    audio: media.audioOn,
+    video: media.videoOn,
+  });
 
   useEffect(() => {
     getMeeting(code)
@@ -45,19 +55,34 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
   }, [code]);
 
   useEffect(() => {
-    // The host arrives from the dashboard without a name in the URL: use their account name
-    if (isHost && !displayName) getMe().then((user) => setName(user.name));
+    if (!isHost) return;
+    getMe().then((user) => {
+      setUserId(user.id);
+      // The host arrives from the dashboard without a name in the URL: use their account name
+      if (!displayName) setName(user.name);
+    });
   }, [isHost, displayName]);
+
+  function toggleAudio() {
+    media.toggleAudio();
+    socket.sendMediaState(!media.audioOn, media.videoOn);
+  }
+
+  function toggleVideo() {
+    media.toggleVideo();
+    socket.sendMediaState(media.audioOn, !media.videoOn);
+  }
 
   function leave() {
     media.stop();
     router.push("/");
   }
 
-  if (error || meeting?.has_ended) {
+  const fatalError = error ?? socket.error ?? (meeting?.has_ended ? "This meeting has ended." : null);
+  if (fatalError) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-meeting-bg p-4 text-white">
-        <p className="text-lg">{error ?? "This meeting has ended."}</p>
+        <p className="text-lg">{fatalError}</p>
         <Link
           href="/"
           className="rounded-lg bg-zoom-blue px-5 py-2 text-sm font-medium hover:bg-zoom-blue-dark"
@@ -93,9 +118,24 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     );
   }
 
-  const participants: Participant[] = [
-    { id: SELF_ID, display_name: name.trim(), is_host: isHost, audio: media.audioOn, video: media.videoOn },
-  ];
+  // Until the server's welcome arrives, show just the local user.
+  // After that, use the live roster, but always take our own mic/camera state from the
+  // local hook so our tile updates instantly instead of waiting for the server echo.
+  const selfId = socket.selfId ?? -1;
+  const participants: Participant[] =
+    socket.selfId === null
+      ? [
+          {
+            id: selfId,
+            display_name: name.trim(),
+            is_host: isHost,
+            audio: media.audioOn,
+            video: media.videoOn,
+          },
+        ]
+      : socket.participants.map((p) =>
+          p.id === selfId ? { ...p, audio: media.audioOn, video: media.videoOn } : p,
+        );
 
   return (
     <div className="flex h-dvh flex-col bg-meeting-bg text-white">
@@ -115,14 +155,23 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
         )}
       </header>
 
+      {socket.disconnected && (
+        <p className="bg-red-600 px-4 py-1.5 text-center text-sm">
+          Connection lost.{" "}
+          <button onClick={() => window.location.reload()} className="font-semibold underline">
+            Rejoin
+          </button>
+        </p>
+      )}
+
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
-          <VideoGrid participants={participants} selfId={SELF_ID} selfStream={media.stream} />
+          <VideoGrid participants={participants} selfId={selfId} selfStream={media.stream} />
         </div>
         {participantsOpen && (
           <ParticipantsPanel
             participants={participants}
-            selfId={SELF_ID}
+            selfId={selfId}
             onClose={() => setParticipantsOpen(false)}
           />
         )}
@@ -134,8 +183,8 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
         mediaAvailable={media.stream !== null}
         participantCount={participants.length}
         participantsOpen={participantsOpen}
-        onToggleAudio={media.toggleAudio}
-        onToggleVideo={media.toggleVideo}
+        onToggleAudio={toggleAudio}
+        onToggleVideo={toggleVideo}
         onToggleParticipants={() => setParticipantsOpen((open) => !open)}
         onLeave={leave}
       />
