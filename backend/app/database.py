@@ -1,12 +1,14 @@
+import os
 from collections.abc import Generator
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-# backend/zoom.db, regardless of which directory the server is started from
+# Default: backend/zoom.db, regardless of which directory the server is started from.
+# DATABASE_URL overrides it (the tests point it somewhere else).
 DB_PATH = Path(__file__).resolve().parent.parent / "zoom.db"
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 # check_same_thread=False: FastAPI may use a session from a different thread than the one that created it
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})

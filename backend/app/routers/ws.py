@@ -1,21 +1,76 @@
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Participant, utcnow
+from app.models import Meeting, Participant, utcnow
 from app.realtime import Connection, manager
 from app.routers.meetings import get_joinable_meeting
 from app.schemas import JoinMessage
 
 router = APIRouter()
 
-# Custom close code (4000-4999 are reserved for applications)
+# Custom close codes (4000-4999 are reserved for applications)
 CLOSE_CANNOT_JOIN = 4001
+CLOSE_REMOVED = 4003
+CLOSE_MEETING_ENDED = 4004
+
+HOST_COMMANDS = {"mute_all", "remove_participant", "end_meeting"}
 
 
 async def reject(websocket: WebSocket, message: str) -> None:
     await websocket.send_json({"type": "error", "message": message})
     await websocket.close(code=CLOSE_CANNOT_JOIN)
+
+
+async def mute_all(code: str, host: Connection) -> None:
+    for connection in manager.connections(code):
+        if connection.participant_id == host.participant_id or not connection.audio:
+            continue
+        connection.audio = False
+        await manager.send(connection, {"type": "force_mute"})  # their browser turns the mic off
+        await manager.broadcast(code, {"type": "participant_updated", "participant": connection.to_dict()})
+
+
+def was_removed(db: Session, meeting: Meeting, display_name: str) -> bool:
+    # There are no accounts for guests, so the display name is the only identity we have:
+    # someone the host removed can't come back under the same name (case-insensitive).
+    return db.scalar(
+        select(Participant.id)
+        .where(
+            Participant.meeting_id == meeting.id,
+            Participant.removed.is_(True),
+            func.lower(Participant.display_name) == display_name.lower(),
+        )
+        .limit(1)
+    ) is not None
+
+
+async def remove_participant(db: Session, code: str, host: Connection, participant_id: object) -> None:
+    # participant_id comes straight from client JSON, so check it really is an int
+    target = manager.get(code, participant_id) if isinstance(participant_id, int) else None
+    if target is None or target is host:
+        await manager.send(host, {"type": "error", "message": "Participant not found"})
+        return
+    db.get(Participant, participant_id).removed = True
+    db.commit()
+    await manager.send(target, {"type": "removed"})
+    try:
+        # Their own handler sees the disconnect and broadcasts participant_left
+        await target.websocket.close(code=CLOSE_REMOVED)
+    except Exception:
+        pass
+
+
+async def end_meeting(db: Session, meeting: Meeting, code: str) -> None:
+    meeting.ended_at = utcnow()  # from now on, joins are rejected with 410 / "has ended"
+    db.commit()
+    await manager.broadcast(code, {"type": "meeting_ended"})
+    for connection in manager.connections(code):
+        try:
+            await connection.websocket.close(code=CLOSE_MEETING_ENDED)
+        except Exception:
+            pass
 
 
 @router.websocket("/ws/meetings/{code}")
@@ -33,6 +88,9 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
         await reject(websocket, exc.detail)
         return
     except WebSocketDisconnect:
+        return
+    if was_removed(db, meeting, join.display_name):
+        await reject(websocket, "You were removed from this meeting")
         return
 
     # 2. Record the attendance and start the meeting if this is the first person in
@@ -74,12 +132,22 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
     try:
         while True:
             message = await websocket.receive_json()
-            if message.get("type") == "media_state":
+            kind = message.get("type")
+            if kind == "media_state":
                 connection.audio = bool(message.get("audio"))
                 connection.video = bool(message.get("video"))
                 await manager.broadcast(
                     code, {"type": "participant_updated", "participant": connection.to_dict()}
                 )
+            elif kind in HOST_COMMANDS and not connection.is_host:
+                await websocket.send_json({"type": "error", "message": "Only the host can do that"})
+            elif kind == "mute_all":
+                await mute_all(code, connection)
+            elif kind == "remove_participant":
+                await remove_participant(db, code, connection, message.get("participant_id"))
+            elif kind == "end_meeting":
+                await end_meeting(db, meeting, code)
+                break  # our own socket was closed too
             else:
                 await websocket.send_json({"type": "error", "message": "Unknown message type"})
     except (WebSocketDisconnect, ValueError):

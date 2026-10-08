@@ -104,3 +104,88 @@ def test_unknown_and_ended_meetings_are_rejected(client, meeting, db_session):
     with client.websocket_connect(ws_url(meeting)) as ws:
         ws.send_json(join_message(meeting))
         assert ws.receive_json()["message"] == "This meeting has ended"
+
+
+# --- host controls ---
+
+
+def join_pair(client, meeting, host, guest):
+    """Host and one guest in the meeting; returns once both have drained their join messages."""
+    host.send_json(join_message(meeting, name="Chirag", user_id=1))
+    host.receive_json()  # welcome
+    guest.send_json(join_message(meeting, name="Asha"))
+    guest_welcome = guest.receive_json()
+    host.receive_json()  # participant_joined (Asha)
+    return guest_welcome["self_id"]
+
+
+def test_mute_all_mutes_everyone_but_the_host(client, meeting):
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        join_pair(client, meeting, host, guest)
+        host.send_json({"type": "mute_all"})
+
+        assert guest.receive_json() == {"type": "force_mute"}
+        assert guest.receive_json()["participant"]["audio"] is False
+        update = host.receive_json()
+        assert update["type"] == "participant_updated"
+        assert update["participant"]["display_name"] == "Asha"
+        assert update["participant"]["audio"] is False
+
+
+def test_guests_cannot_use_host_commands(client, meeting):
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        join_pair(client, meeting, host, guest)
+        for command in ("mute_all", "end_meeting"):
+            guest.send_json({"type": command})
+            assert guest.receive_json() == {"type": "error", "message": "Only the host can do that"}
+
+
+def test_end_meeting_disconnects_everyone_and_blocks_joins(client, meeting, db_session):
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        join_pair(client, meeting, host, guest)
+        host.send_json({"type": "end_meeting"})
+
+        assert guest.receive_json() == {"type": "meeting_ended"}
+        with pytest.raises(WebSocketDisconnect) as closed:
+            guest.receive_json()
+        assert closed.value.code == 4004
+
+    assert db_session.query(Meeting).filter_by(code=meeting["code"]).one().ended_at is not None
+    with client.websocket_connect(ws_url(meeting)) as late:
+        late.send_json(join_message(meeting))
+        assert late.receive_json()["message"] == "This meeting has ended"
+
+
+def test_host_removes_participant_who_cannot_rejoin_under_that_name(client, meeting, db_session):
+    with client.websocket_connect(ws_url(meeting)) as host:
+        with client.websocket_connect(ws_url(meeting)) as guest:
+            guest_id = join_pair(client, meeting, host, guest)
+            host.send_json({"type": "remove_participant", "participant_id": guest_id})
+
+            assert guest.receive_json() == {"type": "removed"}
+            with pytest.raises(WebSocketDisconnect) as closed:
+                guest.receive_json()
+            assert closed.value.code == 4003
+        # The test client confirms the close when its "with" block exits (a browser does it
+        # immediately); only then does the guest's handler run its cleanup and tell the host
+        assert host.receive_json() == {"type": "participant_left", "participant_id": guest_id}
+
+    assert db_session.get(Participant, guest_id).removed is True
+
+    with client.websocket_connect(ws_url(meeting)) as again:
+        again.send_json(join_message(meeting, name="ASHA"))
+        assert again.receive_json()["message"] == "You were removed from this meeting"
+    with client.websocket_connect(ws_url(meeting)) as other:
+        other.send_json(join_message(meeting, name="Ravi"))
+        assert other.receive_json()["type"] == "welcome"
+
+
+def test_remove_rejects_bad_targets_and_guests(client, meeting):
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        guest_id = join_pair(client, meeting, host, guest)
+        for bad in (12345, "1", None):
+            host.send_json({"type": "remove_participant", "participant_id": bad})
+            assert host.receive_json() == {"type": "error", "message": "Participant not found"}
+
+        guest.send_json({"type": "remove_participant", "participant_id": guest_id})
+        assert guest.receive_json() == {"type": "error", "message": "Only the host can do that"}

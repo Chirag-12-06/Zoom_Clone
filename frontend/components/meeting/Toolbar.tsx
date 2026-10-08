@@ -1,4 +1,7 @@
+"use client";
+
 import { MessageSquare, Mic, MicOff, MonitorUp, Users, Video, VideoOff } from "lucide-react";
+import { useState } from "react";
 
 type ToolbarProps = {
   audioOn: boolean;
@@ -10,11 +13,14 @@ type ToolbarProps = {
   onToggleVideo: () => void;
   onToggleParticipants: () => void;
   onLeave: () => void;
+  isHost: boolean;
+  onEndMeeting: () => void;
 };
 
 /** Zoom's bottom bar: mic and camera on the left, features in the middle, Leave on the right */
 export default function Toolbar(props: ToolbarProps) {
   const { audioOn, videoOn, mediaAvailable, participantCount, participantsOpen } = props;
+  const [endMenuOpen, setEndMenuOpen] = useState(false);
 
   return (
     <footer className="flex h-16 shrink-0 items-center justify-between gap-2 bg-toolbar-bg px-2 text-white sm:px-4">
@@ -53,12 +59,40 @@ export default function Toolbar(props: ToolbarProps) {
         </ToolbarButton>
       </div>
 
-      <button
-        onClick={props.onLeave}
-        className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold hover:bg-red-700"
-      >
-        Leave
-      </button>
+      {props.isHost ? (
+        // Like Zoom: the host chooses between ending for everyone and just leaving
+        <div className="relative">
+          <button
+            onClick={() => setEndMenuOpen((open) => !open)}
+            className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold hover:bg-red-700"
+          >
+            End
+          </button>
+          {endMenuOpen && (
+            <div className="absolute bottom-12 right-0 z-30 flex w-52 flex-col gap-2 rounded-lg bg-[#2b2b2b] p-3 shadow-xl">
+              <button
+                onClick={props.onEndMeeting}
+                className="rounded-lg bg-red-600 py-2 text-sm font-semibold hover:bg-red-700"
+              >
+                End Meeting for All
+              </button>
+              <button
+                onClick={props.onLeave}
+                className="rounded-lg bg-[#3a3a3a] py-2 text-sm font-semibold hover:bg-[#4a4a4a]"
+              >
+                Leave Meeting
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={props.onLeave}
+          className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold hover:bg-red-700"
+        >
+          Leave
+        </button>
+      )}
     </footer>
   );
 }
