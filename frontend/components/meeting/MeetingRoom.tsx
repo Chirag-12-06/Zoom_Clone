@@ -174,7 +174,14 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
           <ParticipantsPanel
             participants={participants}
             selfId={selfId}
+            isHost={socket.isHost}
             onClose={() => setParticipantsOpen(false)}
+            onMuteAll={socket.muteAll}
+            onRemove={(participant) => {
+              if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
+                socket.removeParticipant(participant.id);
+              }
+            }}
           />
         )}
       </div>
