@@ -42,6 +42,8 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     userId,
     audio: media.audioOn,
     video: media.videoOn,
+    // The server already marked us muted for everyone; just turn the real mic off
+    onForceMute: () => media.setAudio(false),
   });
 
   useEffect(() => {

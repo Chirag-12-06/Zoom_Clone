@@ -47,4 +47,7 @@ export type ServerMessage =
   | { type: "participant_joined"; participant: Participant }
   | { type: "participant_updated"; participant: Participant }
   | { type: "participant_left"; participant_id: number }
+  | { type: "force_mute" } // the host muted everyone
+  | { type: "removed" } // the host removed you
+  | { type: "meeting_ended" } // the host ended the meeting for all
   | { type: "error"; message: string };
