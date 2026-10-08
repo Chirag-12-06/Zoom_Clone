@@ -33,7 +33,10 @@ export default function VideoTile({ participant, stream, isSelf = false }: Video
           className="h-full w-full -scale-x-100 object-cover"
         />
       ) : (
-        <Avatar name={participant.display_name} className="h-20 w-20 text-3xl sm:h-24 sm:w-24" />
+        <Avatar
+          name={participant.display_name}
+          className="h-12 w-12 text-lg sm:h-20 sm:w-20 sm:text-3xl lg:h-24 lg:w-24"
+        />
       )}
 
       <div className="absolute bottom-2 left-2 flex max-w-[90%] items-center gap-1 rounded bg-black/60 px-2 py-0.5 text-xs text-white">
