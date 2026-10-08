@@ -33,7 +33,17 @@ export const getRecentMeetings = () => request<RecentMeeting[]>("/api/meetings/r
 
 export const createInstantMeeting = () => request<Meeting>("/api/meetings/instant", { method: "POST" });
 
-export const getMeeting = (code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
+export type ScheduleMeetingBody = {
+  title: string;
+  description: string | null;
+  start_time: string; // ISO 8601 with timezone
+  duration_minutes: number;
+};
+
+export const scheduleMeeting = (body: ScheduleMeetingBody) =>
+  request<Meeting>("/api/meetings", { method: "POST", body: JSON.stringify(body) });
+
+export const getMeeting =(code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
 
 /** Checks the meeting exists, the passcode is right and it hasn't ended. Throws ApiError otherwise. */
 export const checkJoin = (code: string, passcode: string, displayName: string) =>
