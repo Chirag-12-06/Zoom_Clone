@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,7 +7,8 @@ from app.database import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    # SQLite has no timezone support, so every datetime in the DB is a naive datetime in UTC
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class User(Base):
@@ -38,7 +39,6 @@ class Meeting(Base):
     type: Mapped[str] = mapped_column(String(10))
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
-    # All datetimes are stored in UTC
     scheduled_start: Mapped[datetime | None] = mapped_column(DateTime)
     duration_minutes: Mapped[int | None]
     started_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -47,6 +47,12 @@ class Meeting(Base):
 
     host: Mapped[User] = relationship(back_populates="meetings")
     participants: Mapped[list["Participant"]] = relationship(back_populates="meeting")
+
+    @property
+    def scheduled_end(self) -> datetime | None:
+        if self.scheduled_start is None or self.duration_minutes is None:
+            return None
+        return self.scheduled_start + timedelta(minutes=self.duration_minutes)
 
 
 class Participant(Base):
