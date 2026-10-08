@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import ActionTiles from "@/components/dashboard/ActionTiles";
@@ -7,14 +8,17 @@ import ClockCard from "@/components/dashboard/ClockCard";
 import RecentMeetings from "@/components/dashboard/RecentMeetings";
 import TopNav from "@/components/dashboard/TopNav";
 import UpcomingMeetings from "@/components/dashboard/UpcomingMeetings";
-import { getMe, getRecentMeetings, getUpcomingMeetings } from "@/lib/api";
+import { createInstantMeeting, getMe, getRecentMeetings, getUpcomingMeetings } from "@/lib/api";
+import { roomUrl } from "@/lib/meeting-link";
 import type { Meeting, RecentMeeting, User } from "@/lib/types";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [upcoming, setUpcoming] = useState<Meeting[]>([]);
   const [recent, setRecent] = useState<RecentMeeting[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     // Fetch all three in parallel
@@ -27,6 +31,18 @@ export default function DashboardPage() {
       .catch(() => setError("Can't reach the server. Is the backend running?"));
   }, []);
 
+  async function handleNewMeeting() {
+    if (creating) return; // ignore double clicks
+    setCreating(true);
+    try {
+      const meeting = await createInstantMeeting();
+      router.push(roomUrl(meeting.code, meeting.passcode, { host: true }));
+    } catch {
+      setError("Couldn't start a meeting. Please try again.");
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <TopNav user={user} />
@@ -36,7 +52,7 @@ export default function DashboardPage() {
       <main className="mx-auto grid w-full max-w-6xl flex-1 content-start gap-10 px-4 py-10 lg:grid-cols-2">
         <section className="flex min-w-0 flex-col gap-10">
           <div className="py-6">
-            <ActionTiles />
+            <ActionTiles onNewMeeting={handleNewMeeting} />
           </div>
           <div>
             <h2 className="mb-3 text-sm font-semibold text-gray-700">Recent meetings</h2>

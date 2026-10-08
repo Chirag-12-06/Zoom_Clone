@@ -23,3 +23,11 @@ export type Meeting = {
 export type RecentMeeting = Meeting & {
   participant_count: number;
 };
+
+/** What anyone with the meeting ID can see (no passcode) */
+export type MeetingPublic = {
+  code: string;
+  title: string;
+  host_name: string;
+  has_ended: boolean;
+};
