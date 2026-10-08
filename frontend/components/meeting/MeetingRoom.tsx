@@ -11,6 +11,7 @@ type MeetingRoomProps = {
   code: string;
   passcode: string;
   isHost: boolean;
+  displayName: string;
 };
 
 export default function MeetingRoom({ code, passcode }: MeetingRoomProps) {
