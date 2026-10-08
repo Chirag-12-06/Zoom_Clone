@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [upcoming, setUpcoming] = useState<Meeting[]>([]);
   const [recent, setRecent] = useState<RecentMeeting[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -30,7 +31,8 @@ export default function DashboardPage() {
         setUpcoming(upcomingMeetings);
         setRecent(recentMeetings);
       })
-      .catch(() => setError("Can't reach the server. Is the backend running?"));
+      .catch(() => setError("Can't reach the server. Is the backend running?"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleNewMeeting() {
@@ -51,27 +53,28 @@ export default function DashboardPage() {
 
       {error && <p className="bg-red-50 px-4 py-2 text-center text-sm text-red-700">{error}</p>}
 
-      <main className="mx-auto grid w-full max-w-6xl flex-1 content-start gap-10 px-4 py-10 lg:grid-cols-2">
-        <section className="flex min-w-0 flex-col gap-10">
-          <div className="py-6">
-            <ActionTiles
-              onNewMeeting={handleNewMeeting}
-              onJoin={() => router.push("/join")}
-              onSchedule={() => setScheduleOpen(true)}
-            />
-          </div>
-          <div>
-            <h2 className="mb-3 text-sm font-semibold text-gray-700">Recent meetings</h2>
-            <RecentMeetings meetings={recent} />
-          </div>
+      {/* Phones: one column in source order (tiles, upcoming, recent).
+          Desktop: tiles and recent on the left, the clock card spans both rows on the right. */}
+      <main className="mx-auto grid w-full max-w-6xl flex-1 content-start gap-8 px-4 py-8 sm:py-10 lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:gap-x-10">
+        <section className="min-w-0 py-4 sm:py-6">
+          <ActionTiles
+            onNewMeeting={handleNewMeeting}
+            onJoin={() => router.push("/join")}
+            onSchedule={() => setScheduleOpen(true)}
+          />
         </section>
 
-        <section className="h-fit min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <section className="h-fit min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white lg:row-span-2">
           <ClockCard />
           <h2 className="border-b border-gray-100 px-5 py-3 text-sm font-semibold text-gray-700">
             Upcoming meetings
           </h2>
-          <UpcomingMeetings meetings={upcoming} />
+          {loading ? <LoadingText /> : <UpcomingMeetings meetings={upcoming} />}
+        </section>
+
+        <section className="min-w-0">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">Recent meetings</h2>
+          {loading ? <LoadingText /> : <RecentMeetings meetings={recent} />}
         </section>
       </main>
 
@@ -84,4 +87,8 @@ export default function DashboardPage() {
       )}
     </div>
   );
+}
+
+function LoadingText() {
+  return <p className="py-8 text-center text-sm text-gray-400">Loading…</p>;
 }
