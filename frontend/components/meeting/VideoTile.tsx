@@ -25,7 +25,13 @@ export default function VideoTile({ participant, stream, isSelf = false }: Video
     <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-[#2b2b2b]">
       {showVideo ? (
         // muted: never play your own mic back to yourself. -scale-x-100 mirrors it like a real mirror.
-        <video ref={videoRef} autoPlay playsInline muted className="h-full w-full -scale-x-100 object-cover" />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="h-full w-full -scale-x-100 object-cover"
+        />
       ) : (
         <Avatar name={participant.display_name} className="h-20 w-20 text-3xl sm:h-24 sm:w-24" />
       )}
