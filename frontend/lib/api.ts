@@ -25,6 +25,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json();
 }
 
+/** http://localhost:8000 -> ws://localhost:8000/ws/meetings/<code> (https becomes wss) */
+export const meetingSocketUrl = (code: string) => `${API_URL.replace(/^http/, "ws")}/ws/meetings/${code}`;
+
 export const getMe = () => request<User>("/api/me");
 
 export const getUpcomingMeetings = () => request<Meeting[]>("/api/meetings/upcoming");
@@ -43,7 +46,7 @@ export type ScheduleMeetingBody = {
 export const scheduleMeeting = (body: ScheduleMeetingBody) =>
   request<Meeting>("/api/meetings", { method: "POST", body: JSON.stringify(body) });
 
-export const getMeeting =(code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
+export const getMeeting = (code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
 
 /** Checks the meeting exists, the passcode is right and it hasn't ended. Throws ApiError otherwise. */
 export const checkJoin = (code: string, passcode: string, displayName: string) =>

@@ -40,3 +40,11 @@ export type Participant = {
   audio: boolean; // mic on
   video: boolean; // camera on
 };
+
+/** Messages the server sends on the meeting WebSocket (see backend/app/routers/ws.py) */
+export type ServerMessage =
+  | { type: "welcome"; self_id: number; is_host: boolean; participants: Participant[] }
+  | { type: "participant_joined"; participant: Participant }
+  | { type: "participant_updated"; participant: Participant }
+  | { type: "participant_left"; participant_id: number }
+  | { type: "error"; message: string };
