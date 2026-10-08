@@ -124,13 +124,18 @@ def get_meeting(code: str, db: Session = Depends(get_db)):
     return to_public(get_meeting_or_404(db, code))
 
 
-@router.post("/{code}/join", response_model=MeetingPublic)
-def join_meeting(code: str, body: JoinRequest, db: Session = Depends(get_db)):
-    """Check that a meeting can be joined. The actual joining happens over the WebSocket."""
+def get_joinable_meeting(db: Session, code: str, passcode: str) -> Meeting:
+    """The rules for joining, shared by the REST check below and the WebSocket join."""
     meeting = get_meeting_or_404(db, code)
     # compare_digest takes the same time whether the passcode is close or not
-    if not secrets.compare_digest(body.passcode, meeting.passcode):
+    if not secrets.compare_digest(passcode, meeting.passcode):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Incorrect passcode")
     if meeting.ended_at is not None:
         raise HTTPException(status.HTTP_410_GONE, "This meeting has ended")
-    return to_public(meeting)
+    return meeting
+
+
+@router.post("/{code}/join", response_model=MeetingPublic)
+def join_meeting(code: str, body: JoinRequest, db: Session = Depends(get_db)):
+    """Check that a meeting can be joined. The actual joining happens over the WebSocket."""
+    return to_public(get_joinable_meeting(db, code, body.passcode))
