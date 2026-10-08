@@ -46,16 +46,21 @@ class ConnectionManager:
     def roster(self, code: str) -> list[dict]:
         return [connection.to_dict() for connection in self.rooms.get(code, {}).values()]
 
+    def connections(self, code: str) -> list[Connection]:
+        # A copy, so the room can change while the caller is awaiting sends
+        return list(self.rooms.get(code, {}).values())
+
+    async def send(self, connection: Connection, message: dict) -> None:
+        try:
+            await connection.websocket.send_json(message)
+        except Exception:
+            # That socket is already closing; its own handler will clean it up
+            pass
+
     async def broadcast(self, code: str, message: dict, exclude: int | None = None) -> None:
-        # list(...) copies the values, so the room can change while we're awaiting sends
-        for connection in list(self.rooms.get(code, {}).values()):
-            if connection.participant_id == exclude:
-                continue
-            try:
-                await connection.websocket.send_json(message)
-            except Exception:
-                # That socket is already closing; its own handler will clean it up
-                pass
+        for connection in self.connections(code):
+            if connection.participant_id != exclude:
+                await self.send(connection, message)
 
 
 manager = ConnectionManager()

@@ -2,20 +2,43 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Participant, utcnow
+from app.models import Meeting, Participant, utcnow
 from app.realtime import Connection, manager
 from app.routers.meetings import get_joinable_meeting
 from app.schemas import JoinMessage
 
 router = APIRouter()
 
-# Custom close code (4000-4999 are reserved for applications)
+# Custom close codes (4000-4999 are reserved for applications)
 CLOSE_CANNOT_JOIN = 4001
+CLOSE_MEETING_ENDED = 4004
+
+HOST_COMMANDS = {"mute_all", "end_meeting"}
 
 
 async def reject(websocket: WebSocket, message: str) -> None:
     await websocket.send_json({"type": "error", "message": message})
     await websocket.close(code=CLOSE_CANNOT_JOIN)
+
+
+async def mute_all(code: str, host: Connection) -> None:
+    for connection in manager.connections(code):
+        if connection.participant_id == host.participant_id or not connection.audio:
+            continue
+        connection.audio = False
+        await manager.send(connection, {"type": "force_mute"})  # their browser turns the mic off
+        await manager.broadcast(code, {"type": "participant_updated", "participant": connection.to_dict()})
+
+
+async def end_meeting(db: Session, meeting: Meeting, code: str) -> None:
+    meeting.ended_at = utcnow()  # from now on, joins are rejected with 410 / "has ended"
+    db.commit()
+    await manager.broadcast(code, {"type": "meeting_ended"})
+    for connection in manager.connections(code):
+        try:
+            await connection.websocket.close(code=CLOSE_MEETING_ENDED)
+        except Exception:
+            pass
 
 
 @router.websocket("/ws/meetings/{code}")
@@ -74,12 +97,20 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
     try:
         while True:
             message = await websocket.receive_json()
-            if message.get("type") == "media_state":
+            kind = message.get("type")
+            if kind == "media_state":
                 connection.audio = bool(message.get("audio"))
                 connection.video = bool(message.get("video"))
                 await manager.broadcast(
                     code, {"type": "participant_updated", "participant": connection.to_dict()}
                 )
+            elif kind in HOST_COMMANDS and not connection.is_host:
+                await websocket.send_json({"type": "error", "message": "Only the host can do that"})
+            elif kind == "mute_all":
+                await mute_all(code, connection)
+            elif kind == "end_meeting":
+                await end_meeting(db, meeting, code)
+                break  # our own socket was closed too
             else:
                 await websocket.send_json({"type": "error", "message": "Unknown message type"})
     except (WebSocketDisconnect, ValueError):
