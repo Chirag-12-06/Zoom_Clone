@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --color-zoom-blue: #0b5cff;
+  --color-zoom-blue-dark: #0e49cc;
+  --color-zoom-orange: #ff742e;
+  --color-meeting-bg: #1a1a1a;
+  --color-toolbar-bg: #242424;
+}
+
+body {
+  @apply bg-white text-gray-900 font-sans;
+}
