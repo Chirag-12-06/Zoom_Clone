@@ -27,14 +27,24 @@ export function useMeetingSocket(options: Options) {
   const [disconnected, setDisconnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
-  // Latest mic/camera state and callback, read inside socket events.
-  // Refs (not effect dependencies) so toggling the mic doesn't reconnect the socket.
-  const mediaRef = useRef({ audio, video });
+  // Latest callback, read inside socket events. A ref (not an effect dependency) so a
+  // new function on every render doesn't reconnect the socket.
   const onForceMuteRef = useRef(onForceMute);
   useEffect(() => {
-    mediaRef.current = { audio, video };
     onForceMuteRef.current = onForceMute;
-  }, [audio, video, onForceMute]);
+  }, [onForceMute]);
+
+  // Mic/camera state: kept in a ref for the join message (again, so toggling doesn't
+  // reconnect), and sent to the server whenever it changes. That also covers the camera
+  // only becoming ready after we've already joined.
+  const mediaRef = useRef({ audio, video });
+  useEffect(() => {
+    mediaRef.current = { audio, video };
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "media_state", audio, video }));
+    }
+  }, [audio, video]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -114,8 +124,6 @@ export function useMeetingSocket(options: Options) {
     error,
     endedReason,
     disconnected,
-    sendMediaState: (audioOn: boolean, videoOn: boolean) =>
-      send({ type: "media_state", audio: audioOn, video: videoOn }),
     muteAll: () => send({ type: "mute_all" }),
     removeParticipant: (participantId: number) =>
       send({ type: "remove_participant", participant_id: participantId }),

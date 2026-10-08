@@ -25,6 +25,7 @@ type MeetingRoomProps = {
 export default function MeetingRoom({ code, passcode, isHost, displayName }: MeetingRoomProps) {
   const router = useRouter();
   const media = useLocalMedia();
+  const stopMedia = media.stop;
   const [meeting, setMeeting] = useState<MeetingPublic | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(displayName);
@@ -32,6 +33,7 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const socket = useMeetingSocket({
     // The host must wait for their user id: it's what makes the server treat them as host
@@ -43,8 +45,22 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     audio: media.audioOn,
     video: media.videoOn,
     // The server already marked us muted for everyone; just turn the real mic off
-    onForceMute: () => media.setAudio(false),
+    onForceMute: () => {
+      media.setAudio(false);
+      setNotice("The host muted everyone");
+    },
   });
+
+  useEffect(() => {
+    // Removed, or the host ended the meeting: release the camera and mic
+    if (socket.endedReason) stopMedia();
+  }, [socket.endedReason, stopMedia]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     getMeeting(code)
@@ -65,22 +81,22 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     });
   }, [isHost, displayName]);
 
-  function toggleAudio() {
-    media.toggleAudio();
-    socket.sendMediaState(!media.audioOn, media.videoOn);
-  }
-
-  function toggleVideo() {
-    media.toggleVideo();
-    socket.sendMediaState(media.audioOn, !media.videoOn);
-  }
-
   function leave() {
     media.stop();
-    router.push("/");
+    router.push("/"); // unmounting closes the socket, so everyone else sees us leave
   }
 
-  const fatalError = error ?? socket.error ?? (meeting?.has_ended ? "This meeting has ended." : null);
+  function endForAll() {
+    socket.endMeeting(); // queued before leave() closes the socket, so it's still delivered
+    leave();
+  }
+
+  const fatalError =
+    error ??
+    socket.error ??
+    (socket.endedReason === "removed" ? "You have been removed from this meeting by the host." : null) ??
+    (socket.endedReason === "ended" ? "This meeting has been ended by the host." : null) ??
+    (meeting?.has_ended ? "This meeting has ended." : null);
   if (fatalError) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-meeting-bg p-4 text-white">
@@ -165,6 +181,7 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
           </button>
         </p>
       )}
+      {notice && <p className="bg-[#2b2b2b] px-4 py-1.5 text-center text-sm">{notice}</p>}
 
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
@@ -192,12 +209,12 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
         mediaAvailable={media.stream !== null}
         participantCount={participants.length}
         participantsOpen={participantsOpen}
-        onToggleAudio={toggleAudio}
-        onToggleVideo={toggleVideo}
+        onToggleAudio={media.toggleAudio}
+        onToggleVideo={media.toggleVideo}
         onToggleParticipants={() => setParticipantsOpen((open) => !open)}
         onLeave={leave}
         isHost={socket.isHost}
-        onEndMeeting={socket.endMeeting}
+        onEndMeeting={endForAll}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Asks the browser for the user's camera and microphone and exposes on/off toggles.
@@ -43,29 +43,27 @@ export function useLocalMedia() {
     };
   }, []);
 
-  function setAudio(on: boolean) {
-    stream?.getAudioTracks().forEach((track) => (track.enabled = on));
-    setAudioOn(on);
-  }
+  // Apply the on/off state to the real tracks. As an effect it also covers a stream that
+  // arrives after the state changed (new tracks always start enabled).
+  useEffect(() => {
+    stream?.getAudioTracks().forEach((track) => (track.enabled = audioOn));
+    stream?.getVideoTracks().forEach((track) => (track.enabled = videoOn));
+  }, [stream, audioOn, videoOn]);
 
-  function setVideo(on: boolean) {
-    stream?.getVideoTracks().forEach((track) => (track.enabled = on));
-    setVideoOn(on);
-  }
-
-  /** Stop the camera and mic right away, e.g. when the user clicks Leave */
-  function stop() {
+  /** Stop the camera and mic right away, e.g. when the user clicks Leave.
+   *  useCallback keeps the same function between renders, so effects can depend on it. */
+  const stop = useCallback(() => {
     stream?.getTracks().forEach((track) => track.stop());
-  }
+  }, [stream]);
 
   return {
     stream,
     error,
     audioOn: audioOn && stream !== null,
     videoOn: videoOn && stream !== null,
-    toggleAudio: () => setAudio(!audioOn),
-    toggleVideo: () => setVideo(!videoOn),
-    setAudio,
+    toggleAudio: () => setAudioOn(!audioOn),
+    toggleVideo: () => setVideoOn(!videoOn),
+    setAudio: setAudioOn,
     stop,
   };
 }
