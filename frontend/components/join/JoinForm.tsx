@@ -55,11 +55,11 @@ export default function JoinForm({ initialCode = "", initialPasscode = "" }: Joi
   }
 
   const inputClass =
-    "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue";
+    "w-full rounded-lg border border-zoom-border bg-zoom-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-zoom-muted focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue";
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-gray-200">
         Meeting ID or invite link
         <input
           value={meetingInput}
@@ -69,7 +69,7 @@ export default function JoinForm({ initialCode = "", initialPasscode = "" }: Joi
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-gray-200">
         Passcode
         <input
           value={passcode}
@@ -79,7 +79,7 @@ export default function JoinForm({ initialCode = "", initialPasscode = "" }: Joi
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-gray-200">
         Your name
         <input
           value={name}
@@ -91,13 +91,13 @@ export default function JoinForm({ initialCode = "", initialPasscode = "" }: Joi
         />
       </label>
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>}
 
       {/* All three fields are required, so the button stays disabled until they're filled */}
       <button
         type="submit"
         disabled={submitting || !meetingInput.trim() || !passcode.trim() || !name.trim()}
-        className="rounded-lg bg-zoom-blue py-2.5 text-sm font-semibold text-white hover:bg-zoom-blue-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+        className="rounded-lg bg-zoom-blue py-2.5 text-sm font-semibold text-white hover:bg-zoom-blue-dark disabled:cursor-not-allowed disabled:bg-zoom-surface-2 disabled:text-zoom-muted"
       >
         {submitting ? "Joining…" : "Join"}
       </button>
