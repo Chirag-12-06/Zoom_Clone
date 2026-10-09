@@ -24,8 +24,9 @@ HOST_COMMANDS = {"mute_all", "mute_participant", "remove_participant", "end_meet
 # refresh (old socket closes, new one connects a moment later) doesn't end it by accident
 EMPTY_MEETING_GRACE_SECONDS = 30.0
 
-# asyncio only keeps a weak reference to tasks: hold on to them until they finish
-_background_tasks: set[asyncio.Task] = set()
+# At most one pending "end this meeting" timer per meeting code. Keeping the task here also
+# matters because asyncio itself only holds a weak reference to running tasks.
+_end_timers: dict[str, asyncio.Task] = {}
 
 
 async def reject(websocket: WebSocket, message: str) -> None:
@@ -110,21 +111,32 @@ async def replace_old_host(code: str) -> None:
 
 async def end_if_still_empty(code: str, meeting_id: int, engine: Engine) -> None:
     """Background task: end the meeting if nobody has come back within the grace period."""
-    await asyncio.sleep(EMPTY_MEETING_GRACE_SECONDS)
-    if manager.connections(code):
-        return  # someone rejoined (e.g. the page was refreshed)
-    # The handler's session is closed by now, so use a short-lived one of our own
-    with Session(engine) as db:
-        meeting = db.get(Meeting, meeting_id)
-        if meeting is not None and meeting.ended_at is None:
-            meeting.ended_at = utcnow()
-            db.commit()
+    try:
+        await asyncio.sleep(EMPTY_MEETING_GRACE_SECONDS)
+        if manager.connections(code):
+            return  # safety net; a join normally cancels this timer first
+        # The handler's session is closed by now, so use a short-lived one of our own
+        with Session(engine) as db:
+            meeting = db.get(Meeting, meeting_id)
+            if meeting is not None and meeting.ended_at is None:
+                meeting.ended_at = utcnow()
+                db.commit()
+    finally:
+        if _end_timers.get(code) is asyncio.current_task():
+            del _end_timers[code]
 
 
-def schedule_end_if_empty(code: str, meeting: Meeting, db: Session) -> None:
-    task = asyncio.create_task(end_if_still_empty(code, meeting.id, db.get_bind()))
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+def start_end_timer(code: str, meeting: Meeting, db: Session) -> None:
+    """The room just became empty: (re)start its grace-period timer."""
+    cancel_end_timer(code)
+    _end_timers[code] = asyncio.create_task(end_if_still_empty(code, meeting.id, db.get_bind()))
+
+
+def cancel_end_timer(code: str) -> None:
+    """Someone joined: the meeting isn't empty any more."""
+    timer = _end_timers.pop(code, None)
+    if timer is not None:
+        timer.cancel()
 
 
 async def end_meeting(db: Session, meeting: Meeting, code: str) -> None:
@@ -183,6 +195,7 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
     if is_host:
         await replace_old_host(code)
     manager.add(code, connection)
+    cancel_end_timer(code)  # if the room was empty and counting down, it isn't any more
     await websocket.send_json(
         {
             "type": "welcome",
@@ -229,4 +242,4 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
         await manager.broadcast(code, {"type": "participant_left", "participant_id": participant.id})
         # 6. Last one out: the meeting ends unless someone comes back within the grace period
         if not manager.connections(code):
-            schedule_end_if_empty(code, meeting, db)
+            start_end_timer(code, meeting, db)

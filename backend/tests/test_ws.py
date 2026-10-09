@@ -351,3 +351,29 @@ def test_meeting_stays_open_while_anyone_is_still_in_it(client, meeting, db_sess
             join_pair(client, meeting, host, guest)
         assert host.receive_json()["type"] == "participant_left"  # guest gone, host still here
         assert not wait_until(lambda: ended_at(db_session, meeting) is not None, timeout=0.6)
+
+
+def test_each_last_leave_restarts_the_grace_period(client, meeting, db_session, monkeypatch):
+    """An older timer must not end the meeting early (e.g. a host refreshing twice)."""
+    import time
+
+    from app.routers import ws
+
+    monkeypatch.setattr(ws, "EMPTY_MEETING_GRACE_SECONDS", 0.6)
+    with client.websocket_connect(ws_url(meeting)) as first:
+        first.send_json(join_message(meeting))
+        first.receive_json()
+    left_first = time.monotonic()  # timer 1 starts
+
+    time.sleep(0.3)
+    with client.websocket_connect(ws_url(meeting)) as second:  # cancels timer 1
+        second.send_json(join_message(meeting, name="Ravi"))
+        second.receive_json()
+    left_second = time.monotonic()  # timer 2 starts
+
+    # When timer 1 would have fired, the meeting must still be open
+    time.sleep(max(0, left_first + 0.75 - time.monotonic()))
+    assert ended_at(db_session, meeting) is None
+    # Timer 2 ends it a full grace period after the *last* leave
+    assert wait_until(lambda: ended_at(db_session, meeting) is not None)
+    assert time.monotonic() - left_second >= 0.6
