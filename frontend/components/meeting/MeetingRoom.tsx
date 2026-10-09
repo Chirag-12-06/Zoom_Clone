@@ -105,6 +105,17 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
     leave();
   }
 
+  // Host actions, shared by the participants panel and the video tiles
+  function muteParticipant(participant: Participant) {
+    socket.muteParticipant(participant.id);
+  }
+
+  function removeParticipant(participant: Participant) {
+    if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
+      socket.removeParticipant(participant.id);
+    }
+  }
+
   const fatalError =
     error ??
     socket.error ??
@@ -200,7 +211,14 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
 
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
-          <VideoGrid participants={participants} selfId={selfId} selfStream={media.stream} />
+          <VideoGrid
+            participants={participants}
+            selfId={selfId}
+            selfStream={media.stream}
+            isHost={socket.isHost}
+            onMute={muteParticipant}
+            onRemove={removeParticipant}
+          />
         </div>
         {participantsOpen && (
           <ParticipantsPanel
@@ -209,12 +227,8 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
             isHost={socket.isHost}
             onClose={() => setParticipantsOpen(false)}
             onMuteAll={socket.muteAll}
-            onMute={(participant) => socket.muteParticipant(participant.id)}
-            onRemove={(participant) => {
-              if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
-                socket.removeParticipant(participant.id);
-              }
-            }}
+            onMute={muteParticipant}
+            onRemove={removeParticipant}
           />
         )}
       </div>
