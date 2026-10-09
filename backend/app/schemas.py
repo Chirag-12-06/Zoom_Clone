@@ -7,6 +7,7 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     ConfigDict,
+    EmailStr,
     Field,
     StringConstraints,
     computed_field,
@@ -32,6 +33,23 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: str
+
+
+class SignupRequest(BaseModel):
+    name: Annotated[NonBlankStr, Field(max_length=100)]
+    email: EmailStr
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    user: UserOut
 
 
 class MeetingCreate(BaseModel):
