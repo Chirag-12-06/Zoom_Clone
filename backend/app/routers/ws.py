@@ -1,5 +1,7 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from sqlalchemy import func, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,6 +19,13 @@ CLOSE_MEETING_ENDED = 4004
 CLOSE_REPLACED = 4005
 
 HOST_COMMANDS = {"mute_all", "mute_participant", "remove_participant", "end_meeting"}
+
+# When the last person leaves, wait this long before ending the meeting, so that a page
+# refresh (old socket closes, new one connects a moment later) doesn't end it by accident
+EMPTY_MEETING_GRACE_SECONDS = 30.0
+
+# asyncio only keeps a weak reference to tasks: hold on to them until they finish
+_background_tasks: set[asyncio.Task] = set()
 
 
 async def reject(websocket: WebSocket, message: str) -> None:
@@ -97,6 +106,25 @@ async def replace_old_host(code: str) -> None:
                 await other.websocket.close(code=CLOSE_REPLACED)
             except Exception:
                 pass
+
+
+async def end_if_still_empty(code: str, meeting_id: int, engine: Engine) -> None:
+    """Background task: end the meeting if nobody has come back within the grace period."""
+    await asyncio.sleep(EMPTY_MEETING_GRACE_SECONDS)
+    if manager.connections(code):
+        return  # someone rejoined (e.g. the page was refreshed)
+    # The handler's session is closed by now, so use a short-lived one of our own
+    with Session(engine) as db:
+        meeting = db.get(Meeting, meeting_id)
+        if meeting is not None and meeting.ended_at is None:
+            meeting.ended_at = utcnow()
+            db.commit()
+
+
+def schedule_end_if_empty(code: str, meeting: Meeting, db: Session) -> None:
+    task = asyncio.create_task(end_if_still_empty(code, meeting.id, db.get_bind()))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 async def end_meeting(db: Session, meeting: Meeting, code: str) -> None:
@@ -199,3 +227,6 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
         participant.left_at = utcnow()
         db.commit()
         await manager.broadcast(code, {"type": "participant_left", "participant_id": participant.id})
+        # 6. Last one out: the meeting ends unless someone comes back within the grace period
+        if not manager.connections(code):
+            schedule_end_if_empty(code, meeting, db)

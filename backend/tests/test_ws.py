@@ -294,3 +294,60 @@ def test_guests_never_replace_the_host(client, meeting):
             another.send_json(join_message(meeting, name="Ravi", user_id=999))  # wrong id: a guest
             assert another.receive_json()["is_host"] is False
             assert host.receive_json()["type"] == "participant_joined"  # host still connected
+
+
+# --- meeting ends when everyone has left ---
+
+
+def ended_at(db_session, meeting):
+    db_session.expire_all()  # the server wrote it from another session: re-read it
+    return db_session.query(Meeting).filter_by(code=meeting["code"]).one().ended_at
+
+
+def wait_until(condition, timeout=3.0):
+    """Poll while the server's background task runs on the test client's event loop."""
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def test_meeting_ends_when_the_last_person_leaves(client, meeting, db_session, monkeypatch):
+    from app.routers import ws
+
+    monkeypatch.setattr(ws, "EMPTY_MEETING_GRACE_SECONDS", 0.1)
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        join_pair(client, meeting, host, guest)
+    assert wait_until(lambda: ended_at(db_session, meeting) is not None)
+
+    with client.websocket_connect(ws_url(meeting)) as late:
+        late.send_json(join_message(meeting))
+        assert late.receive_json()["message"] == "This meeting has ended"
+
+
+def test_rejoining_within_the_grace_period_keeps_it_open(client, meeting, db_session, monkeypatch):
+    from app.routers import ws
+
+    monkeypatch.setattr(ws, "EMPTY_MEETING_GRACE_SECONDS", 0.5)
+    with client.websocket_connect(ws_url(meeting)) as first:  # e.g. the page before a refresh
+        first.send_json(join_message(meeting, name="Chirag", user_id=1))
+        first.receive_json()
+    with client.websocket_connect(ws_url(meeting)) as again:  # ...and after it
+        again.send_json(join_message(meeting, name="Chirag", user_id=1))
+        assert again.receive_json()["type"] == "welcome"
+        assert not wait_until(lambda: ended_at(db_session, meeting) is not None, timeout=1.0)
+
+
+def test_meeting_stays_open_while_anyone_is_still_in_it(client, meeting, db_session, monkeypatch):
+    from app.routers import ws
+
+    monkeypatch.setattr(ws, "EMPTY_MEETING_GRACE_SECONDS", 0.1)
+    with client.websocket_connect(ws_url(meeting)) as host:
+        with client.websocket_connect(ws_url(meeting)) as guest:
+            join_pair(client, meeting, host, guest)
+        assert host.receive_json()["type"] == "participant_left"  # guest gone, host still here
+        assert not wait_until(lambda: ended_at(db_session, meeting) is not None, timeout=0.6)
