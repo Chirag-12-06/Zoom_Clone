@@ -19,7 +19,7 @@ A Zoom-style video meetings web app: a dashboard, instant and scheduled meetings
 - **Meetings end on their own** once everyone has left (after a 30-second grace period, so a page refresh doesn't end them)
 - **Zoom Workplace look**: dark theme modelled on the current Zoom app (top bar and side rail, big clock, meetings card with Upcoming / Recent tabs, black meeting toolbar with Host tools and the red End button)
 - **Responsive (bonus)**: works at phone width; the participants panel becomes a full-screen sheet
-- **No auth**: one seeded default user is always "logged in" and hosts every meeting they create
+- **Accounts**: sign up / sign in with email and password (Argon2-hashed, JWT login tokens). The dashboard, starting and scheduling need an account; **guests join meetings without one**, through invite links or `/join`. Demo account: `chirag@example.com` / `zoomdemo123`
 
 There is deliberately no WebRTC: you see your own camera, and other people appear as avatar tiles with their live mic and camera state.
 
@@ -55,6 +55,8 @@ npm install
 npm run dev
 ```
 
+**Sign in** with the demo account `chirag@example.com` / `zoomdemo123`, or sign up.
+
 **Try it with several people:** start a meeting, copy the invite link from the ⓘ meeting info button, and open it in another browser or a private window.
 
 ### Tests and checks
@@ -72,6 +74,8 @@ cd frontend && npm run lint && npm run build
 | `FRONTEND_URL` | backend, used to build invite links | `http://localhost:3000` |
 | `CORS_ORIGINS` | backend, comma-separated frontend URLs allowed to call the API | `http://localhost:3000` |
 | `DATABASE_URL` | backend | `sqlite:///backend/zoom.db` |
+| `JWT_SECRET` | backend, signs login tokens (**set a long random value in production**) | a dev-only placeholder |
+| `DEMO_PASSWORD` | backend, password of the seeded demo account | `zoomdemo123` |
 
 ## Deploying
 
@@ -85,7 +89,7 @@ Backend on [Render](https://render.com) (it needs a host that keeps WebSocket co
    | Build Command | `pip install -r requirements.txt` |
    | Start Command | `fastapi run app/main.py --port $PORT` |
    | Health Check Path | `/api/health` |
-   | Environment | `PYTHON_VERSION=3.12.7` |
+   | Environment | `PYTHON_VERSION=3.12.7`, `JWT_SECRET=<long random string>` |
 
    Check that `https://<backend>.onrender.com/api/health` returns `{"status":"ok"}`.
 2. **Frontend: Vercel → Add New → Project**, from this repo, with Root Directory `frontend` and `NEXT_PUBLIC_API_URL=https://<backend>.onrender.com`. `NEXT_PUBLIC_` variables are baked in at build time, so redeploy after changing them.
@@ -94,7 +98,7 @@ Backend on [Render](https://render.com) (it needs a host that keeps WebSocket co
 Notes:
 - **Run a single backend instance.** Live rosters are in that process's memory (see [design decisions](#design-decisions-and-trade-offs)).
 - **Render's free tier sleeps** after about 15 idle minutes, so the first request takes 30–60 s. Its disk is also reset on redeploy, which clears the SQLite data.
-- **There is no login,** so anyone who opens the dashboard acts as the default user. Share invite links, not the dashboard.
+- **Set `JWT_SECRET`.** Without it the backend signs tokens with a public placeholder, and anyone could forge a login. A fresh secret logs everyone out, which is harmless.
 
 | Symptom | Likely cause |
 | --- | --- |
@@ -140,8 +144,8 @@ users                     meetings                                 participants 
 id          PK            id               PK                      id            PK
 name                      code             UNIQUE, 11 digits       meeting_id    FK -> meetings  ON DELETE CASCADE, indexed
 email       UNIQUE        passcode                                 user_id       FK -> users     ON DELETE SET NULL (NULL = guest)
-created_at                host_id          FK -> users  CASCADE    display_name
-                          type             CHECK instant|scheduled is_host
+password_hash (Argon2)    host_id          FK -> users  CASCADE    display_name
+created_at                type             CHECK instant|scheduled is_host
                           title, description                       joined_at, left_at
                           scheduled_start  (UTC)                   removed       (blocks rejoining)
                           duration_minutes CHECK > 0
@@ -159,13 +163,17 @@ created_at                host_id          FK -> users  CASCADE    display_name
 
 ### REST (`/api`)
 
+🔒 = needs `Authorization: Bearer <token>`, and works on the logged-in user's own meetings. Everything else is public, so guests can join.
+
 | Method | Path | Purpose | Errors |
 | --- | --- | --- | --- |
-| GET | `/me` | the default user | |
-| POST | `/meetings/instant` | create and start an instant meeting | |
-| POST | `/meetings` | schedule `{title, description?, start_time, duration_minutes}` | 422 for a past time or a time without an offset |
-| GET | `/meetings/upcoming` | scheduled meetings whose end time is still ahead | |
-| GET | `/meetings/recent` | started meetings, with participant count | |
+| POST | `/auth/signup` | `{name, email, password}` (password ≥ 8 chars) → `{access_token, user}` | 409 email taken, 422 |
+| POST | `/auth/login` | `{email, password}` → `{access_token, user}` | 401 (same message for unknown email and wrong password) |
+| GET | `/me` | the logged-in user 🔒 | 401 |
+| POST | `/meetings/instant` | create and start an instant meeting 🔒 | 401 |
+| POST | `/meetings` | schedule `{title, description?, start_time, duration_minutes}` 🔒 | 422 for a past time or a time without an offset |
+| GET | `/meetings/upcoming` | scheduled meetings whose end time is still ahead 🔒 | |
+| GET | `/meetings/recent` | started meetings, with participant count 🔒 | |
 | GET | `/meetings/{code}` | public info for join screens (no passcode) | 404 |
 | POST | `/meetings/{code}/join` | check `{passcode, display_name}` before entering | 404, 403 wrong passcode, 410 ended |
 
@@ -175,7 +183,7 @@ The first message must be `join`. The server applies the same rules as the REST 
 
 | Client → server | Payload |
 | --- | --- |
-| `join` | `display_name, passcode, user_id?, audio, video` |
+| `join` | `display_name, passcode, token?, audio, video` (`token` = login token; browsers can't add headers to a WebSocket) |
 | `media_state` | `audio, video` |
 | `mute_all` *(host)* | |
 | `remove_participant` *(host)* | `participant_id` |
@@ -195,13 +203,14 @@ The first message must be `join`. The server applies the same rules as the REST 
 
 - **Empty meetings end after a grace period.** When the last connection closes, a background task waits `EMPTY_MEETING_GRACE_SECONDS` (30 s) and sets `ended_at` only if the room is still empty. Ending immediately would end the meeting on every page refresh.
 - **The live roster is in memory** (`realtime.py`), because WebSocket connections only exist in this server process. The `participants` table is the durable attendance log. Running several server processes would need shared state, for example Redis pub/sub.
-- **The host is whoever joins with `user_id == meeting.host_id`.** That trusts the client, which is acceptable only because the assignment has no auth.
+- **The host is proven, not claimed.** The WebSocket `join` carries the login token; the server verifies it and makes you host only if your account owns the meeting. A forged or someone else's token joins as a regular participant.
+- **Login tokens live in `localStorage`** and are sent as `Authorization: Bearer …`. This works across the two deployment domains (Vercel and Render) without third-party cookies. The trade-off is that page JavaScript can read the token, so the app relies on React escaping everything it renders to avoid XSS. An httpOnly cookie would hide the token from scripts but needs the frontend and API on the same site.
 - **Removed people are blocked by display name** (case-insensitive). Guests have no accounts, so the name is the only identity available; someone could rejoin under a different name.
 - **Mic and camera toggles flip `track.enabled`** rather than stopping the track. It's instant and needs no new permission prompt. An effect keeps the server in sync with the local state, which also covers a camera that becomes ready after you've joined.
 - **Next.js pages read the URL on the server, then hand off to client components** for state, media and sockets. Data loads from FastAPI in the browser.
 
 ## Not in scope
 
-Real audio and video between participants (WebRTC), chat, screen sharing, recording and authentication. Chat and Share Screen appear in the toolbar as disabled placeholders to match Zoom's layout.
+Real audio and video between participants (WebRTC), chat, screen sharing, recording, password reset and email verification. Chat and Share Screen appear in the toolbar as disabled placeholders to match Zoom's layout.
 
 More screenshots: [join](docs/screenshots/join.png) · [pre-join](docs/screenshots/prejoin.png) · [schedule](docs/screenshots/schedule.png)
