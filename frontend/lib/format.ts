@@ -10,9 +10,9 @@ export function formatTime(date: Date): string {
   return date.toLocaleTimeString(LOCALE, { hour: "numeric", minute: "2-digit" });
 }
 
-/** "Thursday, October 8" */
+/** "Friday, October 9, 2026" */
 export function formatLongDate(date: Date): string {
-  return date.toLocaleDateString(LOCALE, { weekday: "long", month: "long", day: "numeric" });
+  return date.toLocaleDateString(LOCALE, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
 /** "Today", "Tomorrow" or e.g. "Sat, Oct 10" */

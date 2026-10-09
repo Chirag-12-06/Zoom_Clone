@@ -13,20 +13,20 @@ type ParticipantsPanelProps = {
   onRemove: (participant: Participant) => void;
 };
 
-const hostButton = "rounded border border-gray-300 px-2 py-0.5 text-xs";
+const hostButton = "rounded-md border border-zoom-border px-2 py-0.5 text-xs";
 
 /** Side panel on desktop, full-screen sheet on phones */
 export default function ParticipantsPanel(props: ParticipantsPanelProps) {
   const { participants, selfId, isHost } = props;
 
   return (
-    <aside className="fixed inset-0 z-20 flex flex-col bg-white text-gray-900 md:static md:w-80 md:shrink-0 md:border-l md:border-gray-200">
-      <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+    <aside className="fixed inset-0 z-20 flex flex-col bg-zoom-surface text-white md:static md:w-80 md:shrink-0 md:border-l md:border-zoom-border">
+      <header className="flex items-center justify-between border-b border-zoom-border px-4 py-3">
         <h2 className="text-sm font-semibold">Participants ({participants.length})</h2>
         <button
           onClick={props.onClose}
           aria-label="Close participants"
-          className="rounded p-1 hover:bg-gray-100"
+          className="rounded p-1 text-zoom-muted hover:bg-white/10 hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
@@ -37,11 +37,11 @@ export default function ParticipantsPanel(props: ParticipantsPanelProps) {
           const isSelf = participant.id === selfId;
           const tags = [participant.is_host && "Host", isSelf && "me"].filter(Boolean);
           return (
-            <li key={participant.id} className="group flex items-center gap-3 px-4 py-2 hover:bg-gray-50">
+            <li key={participant.id} className="group flex items-center gap-3 px-4 py-2 hover:bg-white/5">
               <Avatar name={participant.display_name} />
               <p className="min-w-0 flex-1 truncate text-sm">
                 {participant.display_name}
-                {tags.length > 0 && <span className="text-gray-500"> ({tags.join(", ")})</span>}
+                {tags.length > 0 && <span className="text-zoom-muted"> ({tags.join(", ")})</span>}
               </p>
               {isHost && !isSelf && (
                 // Always visible on touch screens; on desktop they appear when hovering the row
@@ -50,7 +50,7 @@ export default function ParticipantsPanel(props: ParticipantsPanelProps) {
                     <button
                       onClick={() => props.onMute(participant)}
                       aria-label={`Mute ${participant.display_name}`}
-                      className={`${hostButton} hover:bg-gray-100`}
+                      className={`${hostButton} hover:bg-white/10`}
                     >
                       Mute
                     </button>
@@ -58,19 +58,19 @@ export default function ParticipantsPanel(props: ParticipantsPanelProps) {
                   <button
                     onClick={() => props.onRemove(participant)}
                     aria-label={`Remove ${participant.display_name}`}
-                    className={`${hostButton} text-red-600 hover:bg-red-50`}
+                    className={`${hostButton} text-red-400 hover:bg-red-500/15`}
                   >
                     Remove
                   </button>
                 </div>
               )}
               {participant.audio ? (
-                <Mic className="h-4 w-4 text-gray-500" />
+                <Mic className="h-4 w-4 text-zoom-muted" />
               ) : (
                 <MicOff className="h-4 w-4 text-red-500" />
               )}
               {participant.video ? (
-                <Video className="h-4 w-4 text-gray-500" />
+                <Video className="h-4 w-4 text-zoom-muted" />
               ) : (
                 <VideoOff className="h-4 w-4 text-red-500" />
               )}
@@ -80,10 +80,10 @@ export default function ParticipantsPanel(props: ParticipantsPanelProps) {
       </ul>
 
       {isHost && (
-        <footer className="border-t border-gray-200 p-3">
+        <footer className="border-t border-zoom-border p-3">
           <button
             onClick={props.onMuteAll}
-            className="w-full rounded-lg border border-gray-300 py-1.5 text-sm font-medium hover:bg-gray-50"
+            className="w-full rounded-lg border border-zoom-border bg-zoom-surface-2 py-1.5 text-sm font-medium hover:bg-white/15"
           >
             Mute All
           </button>

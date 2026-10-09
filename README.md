@@ -15,7 +15,8 @@ A Zoom-style video meetings web app: a dashboard, instant and scheduled meetings
 - **Join**: by meeting ID (`842 1397 6502`, dashes or spaces are fine) or a pasted invite link, which fills in the passcode. Display name and passcode are required. The backend checks the meeting exists, the passcode matches and the meeting hasn't ended.
 - **Schedule**: topic, description, date, time and duration. Stored in UTC, shown in local time under Upcoming, with a **Start** button.
 - **Meeting room**: pre-join preview with mic and camera toggles, your own webcam via `getUserMedia`, everyone else as avatar tiles, a Zoom bottom toolbar, a participants panel, and the live roster (joins, leaves, mute and camera state) over a FastAPI WebSocket
-- **Host controls (bonus)**: Mute All, Remove participant (they can't rejoin under the same name), End Meeting for All
+- **Host controls (bonus)**: Mute All (toolbar **Host tools** or the participants panel); mute or remove one person from the participants panel or by hovering their video tile (removed people can't rejoin under the same name); End Meeting for All
+- **Zoom Workplace look**: dark theme modelled on the current Zoom app (top bar and side rail, big clock, meetings card with Upcoming / Recent tabs, black meeting toolbar with Host tools and the red End button)
 - **Responsive (bonus)**: works at phone width; the participants panel becomes a full-screen sheet
 - **No auth**: one seeded default user is always "logged in" and hosts every meeting they create
 

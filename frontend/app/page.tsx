@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 
 import ActionTiles from "@/components/dashboard/ActionTiles";
 import ClockCard from "@/components/dashboard/ClockCard";
-import RecentMeetings from "@/components/dashboard/RecentMeetings";
+import MeetingsCard from "@/components/dashboard/MeetingsCard";
+import NavRail from "@/components/dashboard/NavRail";
 import ScheduleModal from "@/components/dashboard/ScheduleModal";
 import TopNav from "@/components/dashboard/TopNav";
-import UpcomingMeetings from "@/components/dashboard/UpcomingMeetings";
 import { createInstantMeeting, getMe, getRecentMeetings, getUpcomingMeetings } from "@/lib/api";
 import { roomUrl } from "@/lib/meeting-link";
 import type { Meeting, RecentMeeting, User } from "@/lib/types";
@@ -48,35 +48,31 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    // Zoom Workplace layout: top bar, left rail, and the home screen in a rounded panel
+    <div className="flex h-dvh flex-col bg-zoom-chrome">
       <TopNav user={user} />
 
-      {error && <p className="bg-red-50 px-4 py-2 text-center text-sm text-red-700">{error}</p>}
+      <div className="flex min-h-0 flex-1">
+        <NavRail />
+        <main className="flex-1 overflow-y-auto bg-zoom-bg sm:mb-2 sm:mr-2 sm:rounded-xl">
+          {error && <p className="bg-red-500/15 px-4 py-2 text-center text-sm text-red-300">{error}</p>}
 
-      {/* Phones: one column in source order (tiles, upcoming, recent).
-          Desktop: tiles and recent on the left, the clock card spans both rows on the right. */}
-      <main className="mx-auto grid w-full max-w-6xl flex-1 content-start gap-8 px-4 py-8 sm:py-10 lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:gap-x-10">
-        <section className="min-w-0 py-4 sm:py-6">
-          <ActionTiles
-            onNewMeeting={handleNewMeeting}
-            onJoin={() => router.push("/join")}
-            onSchedule={() => setScheduleOpen(true)}
-          />
-        </section>
-
-        <section className="h-fit min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white lg:row-span-2">
-          <ClockCard />
-          <h2 className="border-b border-gray-100 px-5 py-3 text-sm font-semibold text-gray-700">
-            Upcoming meetings
-          </h2>
-          {loading ? <LoadingText /> : <UpcomingMeetings meetings={upcoming} />}
-        </section>
-
-        <section className="min-w-0">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Recent meetings</h2>
-          {loading ? <LoadingText /> : <RecentMeetings meetings={recent} />}
-        </section>
-      </main>
+          <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10 sm:gap-10 sm:py-16">
+            <ClockCard />
+            <ActionTiles
+              onNewMeeting={handleNewMeeting}
+              onJoin={() => router.push("/join")}
+              onSchedule={() => setScheduleOpen(true)}
+            />
+            <MeetingsCard
+              loading={loading}
+              upcoming={upcoming}
+              recent={recent}
+              onSchedule={() => setScheduleOpen(true)}
+            />
+          </div>
+        </main>
+      </div>
 
       {scheduleOpen && user && (
         <ScheduleModal
@@ -87,8 +83,4 @@ export default function DashboardPage() {
       )}
     </div>
   );
-}
-
-function LoadingText() {
-  return <p className="py-8 text-center text-sm text-gray-400">Loading…</p>;
 }

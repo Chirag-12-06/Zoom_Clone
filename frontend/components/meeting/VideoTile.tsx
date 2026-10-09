@@ -24,7 +24,7 @@ export default function VideoTile({ participant, stream, isSelf = false, hostAct
   }, [stream, showVideo]);
 
   return (
-    <div className="group relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-[#2b2b2b]">
+    <div className="group relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-zoom-tile">
       {showVideo ? (
         // muted: never play your own mic back to yourself. -scale-x-100 mirrors it like a real mirror.
         <video
