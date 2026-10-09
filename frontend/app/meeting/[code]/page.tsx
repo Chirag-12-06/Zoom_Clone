@@ -9,7 +9,7 @@ export default async function MeetingPage(props: PageProps<"/meeting/[code]">) {
     <MeetingRoom
       code={code}
       passcode={typeof pwd === "string" ? pwd : ""}
-      isHost={host === "1"}
+      hostInUrl={host === "1"}
       displayName={typeof name === "string" ? name : ""}
     />
   );

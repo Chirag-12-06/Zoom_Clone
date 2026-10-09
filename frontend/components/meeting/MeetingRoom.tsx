@@ -13,17 +13,22 @@ import VideoGrid from "@/components/meeting/VideoGrid";
 import { useLocalMedia } from "@/hooks/useLocalMedia";
 import { useMeetingSocket } from "@/hooks/useMeetingSocket";
 import { ApiError, getMe, getMeeting } from "@/lib/api";
+import { isRememberedHost, rememberHost } from "@/lib/meeting-link";
 import type { MeetingPublic, Participant } from "@/lib/types";
 
 type MeetingRoomProps = {
   code: string;
   passcode: string;
-  isHost: boolean;
+  hostInUrl: boolean; // ?host=1, set by the dashboard's New meeting / Start buttons
   displayName: string;
 };
 
-export default function MeetingRoom({ code, passcode, isHost, displayName }: MeetingRoomProps) {
+export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: MeetingRoomProps) {
   const router = useRouter();
+  // Host if the URL says so, or if this tab already came in as host (e.g. after a refresh).
+  // Reading sessionStorage here is safe for hydration: the first render is "Loading meeting…"
+  // either way, so server and browser HTML match.
+  const [isHost] = useState(() => hostInUrl || isRememberedHost(code));
   const media = useLocalMedia();
   const stopMedia = media.stop;
   const [meeting, setMeeting] = useState<MeetingPublic | null>(null);
@@ -63,6 +68,15 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
   }, [notice]);
 
   useEffect(() => {
+    // Remember host status in this tab, then take host=1 out of the address bar so that
+    // copying the URL can't make someone else the host
+    if (!hostInUrl || !rememberHost(code)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("host");
+    window.history.replaceState(null, "", url);
+  }, [hostInUrl, code]);
+
+  useEffect(() => {
     getMeeting(code)
       .then(setMeeting)
       .catch((err) =>
@@ -96,6 +110,7 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     socket.error ??
     (socket.endedReason === "removed" ? "You have been removed from this meeting by the host." : null) ??
     (socket.endedReason === "ended" ? "This meeting has been ended by the host." : null) ??
+    (socket.endedReason === "replaced" ? "You joined this meeting from another window." : null) ??
     (meeting?.has_ended ? "This meeting has ended." : null);
   if (fatalError) {
     return (
@@ -194,6 +209,7 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
             isHost={socket.isHost}
             onClose={() => setParticipantsOpen(false)}
             onMuteAll={socket.muteAll}
+            onMute={(participant) => socket.muteParticipant(participant.id)}
             onRemove={(participant) => {
               if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
                 socket.removeParticipant(participant.id);

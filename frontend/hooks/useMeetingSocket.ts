@@ -23,7 +23,7 @@ export function useMeetingSocket(options: Options) {
   const [selfId, setSelfId] = useState<number | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [endedReason, setEndedReason] = useState<"removed" | "ended" | null>(null);
+  const [endedReason, setEndedReason] = useState<"removed" | "ended" | "replaced" | null>(null);
   const [disconnected, setDisconnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -94,6 +94,9 @@ export function useMeetingSocket(options: Options) {
         case "meeting_ended":
           setEndedReason("ended");
           break;
+        case "replaced":
+          setEndedReason("replaced");
+          break;
         case "error":
           // Before the welcome, an error means we weren't let in. After it, it's a
           // rejected command (e.g. removing someone who already left): not fatal.
@@ -125,6 +128,8 @@ export function useMeetingSocket(options: Options) {
     endedReason,
     disconnected,
     muteAll: () => send({ type: "mute_all" }),
+    muteParticipant: (participantId: number) =>
+      send({ type: "mute_participant", participant_id: participantId }),
     removeParticipant: (participantId: number) =>
       send({ type: "remove_participant", participant_id: participantId }),
     endMeeting: () => send({ type: "end_meeting" }),
