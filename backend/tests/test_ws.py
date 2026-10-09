@@ -251,3 +251,46 @@ def test_host_can_remove_every_participant(client, meeting):
                 assert target.receive_json() == {"type": "removed"}
         left = {host.receive_json()["participant_id"], host.receive_json()["participant_id"]}
         assert left == {asha_id, ravi_id}
+
+
+def test_second_host_connection_replaces_the_first(client, meeting):
+    url = ws_url(meeting)
+    with client.websocket_connect(url) as guest:
+        with client.websocket_connect(url) as old_host:
+            old_host.send_json(join_message(meeting, name="Chirag", user_id=1))
+            old_id = old_host.receive_json()["self_id"]
+            guest.send_json(join_message(meeting, name="Asha"))
+            guest.receive_json()  # welcome
+            old_host.receive_json()  # Asha joined
+
+            with client.websocket_connect(url) as new_host:
+                new_host.send_json(join_message(meeting, name="Chirag", user_id=1))
+
+                assert old_host.receive_json() == {"type": "replaced"}
+                with pytest.raises(WebSocketDisconnect) as closed:
+                    old_host.receive_json()
+                assert closed.value.code == 4005
+
+                welcome = new_host.receive_json()
+                assert welcome["is_host"] is True
+                hosts = [p for p in welcome["participants"] if p["is_host"]]
+                assert [h["id"] for h in hosts] == [welcome["self_id"]]  # exactly one host: the new one
+
+                joined = guest.receive_json()
+                assert joined["type"] == "participant_joined"
+                assert joined["participant"]["id"] == welcome["self_id"]
+
+        # Once each socket's close is confirmed, the guest hears both hosts leave (the old one
+        # included); the new one leaves too because its "with" block has ended
+        left = {guest.receive_json()["participant_id"], guest.receive_json()["participant_id"]}
+        assert left == {old_id, welcome["self_id"]}
+
+
+def test_guests_never_replace_the_host(client, meeting):
+    url = ws_url(meeting)
+    with client.websocket_connect(url) as host, client.websocket_connect(url) as guest:
+        join_pair(client, meeting, host, guest)
+        with client.websocket_connect(url) as another:
+            another.send_json(join_message(meeting, name="Ravi", user_id=999))  # wrong id: a guest
+            assert another.receive_json()["is_host"] is False
+            assert host.receive_json()["type"] == "participant_joined"  # host still connected

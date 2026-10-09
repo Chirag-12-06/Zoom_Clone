@@ -14,6 +14,7 @@ router = APIRouter()
 CLOSE_CANNOT_JOIN = 4001
 CLOSE_REMOVED = 4003
 CLOSE_MEETING_ENDED = 4004
+CLOSE_REPLACED = 4005
 
 HOST_COMMANDS = {"mute_all", "mute_participant", "remove_participant", "end_meeting"}
 
@@ -81,6 +82,23 @@ async def remove_participant(db: Session, code: str, host: Connection, participa
         pass
 
 
+async def replace_old_host(code: str) -> None:
+    """Only one host connection per meeting: the newest one wins.
+
+    Covers the host opening the meeting in a second window, and a page refresh whose new
+    socket arrives before the old one has finished closing.
+    """
+    for other in manager.connections(code):
+        if other.is_host:
+            manager.remove(code, other.participant_id)  # so the newcomer's roster doesn't list it
+            await manager.send(other, {"type": "replaced"})
+            try:
+                # Its own handler then records left_at and broadcasts participant_left
+                await other.websocket.close(code=CLOSE_REPLACED)
+            except Exception:
+                pass
+
+
 async def end_meeting(db: Session, meeting: Meeting, code: str) -> None:
     meeting.ended_at = utcnow()  # from now on, joins are rejected with 410 / "has ended"
     db.commit()
@@ -134,6 +152,8 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
         audio=join.audio,
         video=join.video,
     )
+    if is_host:
+        await replace_old_host(code)
     manager.add(code, connection)
     await websocket.send_json(
         {
