@@ -13,17 +13,22 @@ import VideoGrid from "@/components/meeting/VideoGrid";
 import { useLocalMedia } from "@/hooks/useLocalMedia";
 import { useMeetingSocket } from "@/hooks/useMeetingSocket";
 import { ApiError, getMe, getMeeting } from "@/lib/api";
+import { isRememberedHost, rememberHost } from "@/lib/meeting-link";
 import type { MeetingPublic, Participant } from "@/lib/types";
 
 type MeetingRoomProps = {
   code: string;
   passcode: string;
-  isHost: boolean;
+  hostInUrl: boolean; // ?host=1, set by the dashboard's New meeting / Start buttons
   displayName: string;
 };
 
-export default function MeetingRoom({ code, passcode, isHost, displayName }: MeetingRoomProps) {
+export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: MeetingRoomProps) {
   const router = useRouter();
+  // Host if the URL says so, or if this tab already came in as host (e.g. after a refresh).
+  // Reading sessionStorage here is safe for hydration: the first render is "Loading meeting…"
+  // either way, so server and browser HTML match.
+  const [isHost] = useState(() => hostInUrl || isRememberedHost(code));
   const media = useLocalMedia();
   const stopMedia = media.stop;
   const [meeting, setMeeting] = useState<MeetingPublic | null>(null);
@@ -61,6 +66,15 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     const timer = setTimeout(() => setNotice(null), 4000);
     return () => clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    // Remember host status in this tab, then take host=1 out of the address bar so that
+    // copying the URL can't make someone else the host
+    if (!hostInUrl || !rememberHost(code)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("host");
+    window.history.replaceState(null, "", url);
+  }, [hostInUrl, code]);
 
   useEffect(() => {
     getMeeting(code)
