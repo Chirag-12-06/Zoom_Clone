@@ -96,6 +96,7 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
     socket.error ??
     (socket.endedReason === "removed" ? "You have been removed from this meeting by the host." : null) ??
     (socket.endedReason === "ended" ? "This meeting has been ended by the host." : null) ??
+    (socket.endedReason === "replaced" ? "You joined this meeting from another window." : null) ??
     (meeting?.has_ended ? "This meeting has ended." : null);
   if (fatalError) {
     return (
@@ -194,6 +195,7 @@ export default function MeetingRoom({ code, passcode, isHost, displayName }: Mee
             isHost={socket.isHost}
             onClose={() => setParticipantsOpen(false)}
             onMuteAll={socket.muteAll}
+            onMute={(participant) => socket.muteParticipant(participant.id)}
             onRemove={(participant) => {
               if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
                 socket.removeParticipant(participant.id);

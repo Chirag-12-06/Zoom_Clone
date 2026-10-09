@@ -6,11 +6,14 @@ import type { Participant } from "@/lib/types";
 type ParticipantsPanelProps = {
   participants: Participant[];
   selfId: number;
-  isHost: boolean; // shows Remove and Mute All
+  isHost: boolean; // shows Mute, Remove and Mute All
   onClose: () => void;
   onMuteAll: () => void;
+  onMute: (participant: Participant) => void;
   onRemove: (participant: Participant) => void;
 };
+
+const hostButton = "rounded border border-gray-300 px-2 py-0.5 text-xs";
 
 /** Side panel on desktop, full-screen sheet on phones */
 export default function ParticipantsPanel(props: ParticipantsPanelProps) {
@@ -41,14 +44,25 @@ export default function ParticipantsPanel(props: ParticipantsPanelProps) {
                 {tags.length > 0 && <span className="text-gray-500"> ({tags.join(", ")})</span>}
               </p>
               {isHost && !isSelf && (
-                // Always visible on touch screens; on desktop it appears when hovering the row
-                <button
-                  onClick={() => props.onRemove(participant)}
-                  aria-label={`Remove ${participant.display_name}`}
-                  className="rounded border border-gray-300 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 md:invisible md:group-hover:visible"
-                >
-                  Remove
-                </button>
+                // Always visible on touch screens; on desktop they appear when hovering the row
+                <div className="flex gap-1 md:invisible md:group-hover:visible">
+                  {participant.audio && (
+                    <button
+                      onClick={() => props.onMute(participant)}
+                      aria-label={`Mute ${participant.display_name}`}
+                      className={`${hostButton} hover:bg-gray-100`}
+                    >
+                      Mute
+                    </button>
+                  )}
+                  <button
+                    onClick={() => props.onRemove(participant)}
+                    aria-label={`Remove ${participant.display_name}`}
+                    className={`${hostButton} text-red-600 hover:bg-red-50`}
+                  >
+                    Remove
+                  </button>
+                </div>
               )}
               {participant.audio ? (
                 <Mic className="h-4 w-4 text-gray-500" />

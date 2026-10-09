@@ -50,4 +50,5 @@ export type ServerMessage =
   | { type: "force_mute" } // the host muted everyone
   | { type: "removed" } // the host removed you
   | { type: "meeting_ended" } // the host ended the meeting for all
+  | { type: "replaced" } // the host joined again from another window
   | { type: "error"; message: string };
