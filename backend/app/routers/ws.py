@@ -15,7 +15,7 @@ CLOSE_CANNOT_JOIN = 4001
 CLOSE_REMOVED = 4003
 CLOSE_MEETING_ENDED = 4004
 
-HOST_COMMANDS = {"mute_all", "remove_participant", "end_meeting"}
+HOST_COMMANDS = {"mute_all", "mute_participant", "remove_participant", "end_meeting"}
 
 
 async def reject(websocket: WebSocket, message: str) -> None:
@@ -23,13 +23,34 @@ async def reject(websocket: WebSocket, message: str) -> None:
     await websocket.close(code=CLOSE_CANNOT_JOIN)
 
 
+async def find_target(code: str, host: Connection, participant_id: object) -> Connection | None:
+    """The participant a host command is aimed at, or None (after telling the host why)."""
+    # participant_id comes straight from client JSON, so check it really is an int
+    target = manager.get(code, participant_id) if isinstance(participant_id, int) else None
+    if target is None or target is host:
+        await manager.send(host, {"type": "error", "message": "Participant not found"})
+        return None
+    return target
+
+
+async def mute(code: str, connection: Connection) -> None:
+    if not connection.audio:
+        return  # already muted
+    connection.audio = False
+    await manager.send(connection, {"type": "force_mute"})  # their browser turns the mic off
+    await manager.broadcast(code, {"type": "participant_updated", "participant": connection.to_dict()})
+
+
 async def mute_all(code: str, host: Connection) -> None:
     for connection in manager.connections(code):
-        if connection.participant_id == host.participant_id or not connection.audio:
-            continue
-        connection.audio = False
-        await manager.send(connection, {"type": "force_mute"})  # their browser turns the mic off
-        await manager.broadcast(code, {"type": "participant_updated", "participant": connection.to_dict()})
+        if connection is not host:
+            await mute(code, connection)
+
+
+async def mute_participant(code: str, host: Connection, participant_id: object) -> None:
+    target = await find_target(code, host, participant_id)
+    if target is not None:
+        await mute(code, target)
 
 
 def was_removed(db: Session, meeting: Meeting, display_name: str) -> bool:
@@ -47,12 +68,10 @@ def was_removed(db: Session, meeting: Meeting, display_name: str) -> bool:
 
 
 async def remove_participant(db: Session, code: str, host: Connection, participant_id: object) -> None:
-    # participant_id comes straight from client JSON, so check it really is an int
-    target = manager.get(code, participant_id) if isinstance(participant_id, int) else None
-    if target is None or target is host:
-        await manager.send(host, {"type": "error", "message": "Participant not found"})
+    target = await find_target(code, host, participant_id)
+    if target is None:
         return
-    db.get(Participant, participant_id).removed = True
+    db.get(Participant, target.participant_id).removed = True
     db.commit()
     await manager.send(target, {"type": "removed"})
     try:
@@ -143,6 +162,8 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
                 await websocket.send_json({"type": "error", "message": "Only the host can do that"})
             elif kind == "mute_all":
                 await mute_all(code, connection)
+            elif kind == "mute_participant":
+                await mute_participant(code, connection, message.get("participant_id"))
             elif kind == "remove_participant":
                 await remove_participant(db, code, connection, message.get("participant_id"))
             elif kind == "end_meeting":

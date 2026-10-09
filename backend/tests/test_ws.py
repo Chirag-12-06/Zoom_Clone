@@ -189,3 +189,65 @@ def test_remove_rejects_bad_targets_and_guests(client, meeting):
 
         guest.send_json({"type": "remove_participant", "participant_id": guest_id})
         assert guest.receive_json() == {"type": "error", "message": "Only the host can do that"}
+
+
+def join_trio(meeting, host, asha, ravi):
+    """Host, Asha and Ravi in the meeting with all join messages drained; returns (asha_id, ravi_id)."""
+    host.send_json(join_message(meeting, name="Chirag", user_id=1))
+    host.receive_json()  # welcome
+    asha.send_json(join_message(meeting, name="Asha"))
+    asha_id = asha.receive_json()["self_id"]
+    host.receive_json()  # Asha joined
+    ravi.send_json(join_message(meeting, name="Ravi"))
+    ravi_id = ravi.receive_json()["self_id"]
+    host.receive_json()  # Ravi joined
+    asha.receive_json()  # Ravi joined
+    return asha_id, ravi_id
+
+
+def test_host_mutes_one_participant(client, meeting):
+    url = ws_url(meeting)
+    with client.websocket_connect(url) as host, client.websocket_connect(url) as asha, client.websocket_connect(
+        url
+    ) as ravi:
+        asha_id, _ = join_trio(meeting, host, asha, ravi)
+        host.send_json({"type": "mute_participant", "participant_id": asha_id})
+
+        assert asha.receive_json() == {"type": "force_mute"}  # only Asha's mic is turned off
+        for ws in (host, asha, ravi):
+            update = ws.receive_json()
+            assert update["type"] == "participant_updated"
+            assert update["participant"]["id"] == asha_id
+            assert update["participant"]["audio"] is False
+
+        # Ravi got nothing else: his next message is the reply to his own media change
+        ravi.send_json({"type": "media_state", "audio": True, "video": False})
+        assert ravi.receive_json()["participant"]["display_name"] == "Ravi"
+
+
+def test_mute_participant_rejects_bad_targets_and_guests(client, meeting):
+    with client.websocket_connect(ws_url(meeting)) as host, client.websocket_connect(ws_url(meeting)) as guest:
+        guest_id = join_pair(client, meeting, host, guest)
+        for bad in (12345, "1", None):
+            host.send_json({"type": "mute_participant", "participant_id": bad})
+            assert host.receive_json() == {"type": "error", "message": "Participant not found"}
+
+        guest.send_json({"type": "mute_participant", "participant_id": guest_id})
+        assert guest.receive_json() == {"type": "error", "message": "Only the host can do that"}
+
+
+def test_host_can_remove_every_participant(client, meeting):
+    url = ws_url(meeting)
+    with client.websocket_connect(url) as host:
+        with client.websocket_connect(url) as asha, client.websocket_connect(url) as ravi:
+            asha_id, ravi_id = join_trio(meeting, host, asha, ravi)
+            # Ravi is muted with his camera off: still removable
+            ravi.send_json({"type": "media_state", "audio": False, "video": False})
+            for ws in (host, asha, ravi):
+                ws.receive_json()
+
+            for target_id, target in ((asha_id, asha), (ravi_id, ravi)):
+                host.send_json({"type": "remove_participant", "participant_id": target_id})
+                assert target.receive_json() == {"type": "removed"}
+        left = {host.receive_json()["participant_id"], host.receive_json()["participant_id"]}
+        assert left == {asha_id, ravi_id}
