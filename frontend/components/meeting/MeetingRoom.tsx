@@ -245,6 +245,7 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
         onLeave={leave}
         isHost={socket.isHost}
         onEndMeeting={endForAll}
+        onMuteAll={socket.muteAll}
       />
     </div>
   );
