@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,11 +19,21 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def cors_origins() -> list[str]:
+    """Frontend URLs allowed to call the API, from CORS_ORIGINS (comma-separated).
+
+    e.g. CORS_ORIGINS="https://zoom-clone.vercel.app,http://localhost:3000"
+    Spaces and trailing slashes are dropped: the browser sends the origin without them.
+    """
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
 app = FastAPI(title="Zoom Clone API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )

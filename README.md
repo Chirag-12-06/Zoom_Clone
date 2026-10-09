@@ -58,7 +58,7 @@ npm run dev
 ### Tests and checks
 
 ```bash
-cd backend && pytest                      # 30 tests: REST API, WebSocket roster, host controls
+cd backend && pytest                      # 34 tests: REST API, WebSocket roster, host controls, CORS
 cd frontend && npm run lint && npm run build
 ```
 
@@ -68,7 +68,37 @@ cd frontend && npm run lint && npm run build
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | frontend | `http://localhost:8000` |
 | `FRONTEND_URL` | backend, used to build invite links | `http://localhost:3000` |
+| `CORS_ORIGINS` | backend, comma-separated frontend URLs allowed to call the API | `http://localhost:3000` |
 | `DATABASE_URL` | backend | `sqlite:///backend/zoom.db` |
+
+## Deploying
+
+Backend on [Render](https://render.com) (it needs a host that keeps WebSocket connections open), frontend on [Vercel](https://vercel.com). Guests join from any device with just the invite link; HTTPS on both hosts lets the browser use their camera.
+
+1. **Backend: Render → New → Web Service**, from this repo:
+
+   | Setting | Value |
+   | --- | --- |
+   | Root Directory | `backend` |
+   | Build Command | `pip install -r requirements.txt` |
+   | Start Command | `fastapi run app/main.py --port $PORT` |
+   | Health Check Path | `/api/health` |
+   | Environment | `PYTHON_VERSION=3.12.7` |
+
+   Check that `https://<backend>.onrender.com/api/health` returns `{"status":"ok"}`.
+2. **Frontend: Vercel → Add New → Project**, from this repo, with Root Directory `frontend` and `NEXT_PUBLIC_API_URL=https://<backend>.onrender.com`. `NEXT_PUBLIC_` variables are baked in at build time, so redeploy after changing them.
+3. **Connect them:** in Render set `CORS_ORIGINS` and `FRONTEND_URL` to `https://<frontend>.vercel.app`. Render redeploys on its own.
+
+Notes:
+- **Run a single backend instance.** Live rosters are in that process's memory (see [design decisions](#design-decisions-and-trade-offs)).
+- **Render's free tier sleeps** after about 15 idle minutes, so the first request takes 30–60 s. Its disk is also reset on redeploy, which clears the SQLite data.
+- **There is no login,** so anyone who opens the dashboard acts as the default user. Share invite links, not the dashboard.
+
+| Symptom | Likely cause |
+| --- | --- |
+| "Can't reach the server" | wrong `NEXT_PUBLIC_API_URL`, frontend not redeployed, or the backend is still waking up |
+| CORS error in the browser console | `CORS_ORIGINS` doesn't exactly match the frontend URL |
+| Render build fails | Root Directory isn't `backend` |
 
 ## Project structure
 
