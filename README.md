@@ -16,6 +16,7 @@ A Zoom-style video meetings web app: a dashboard, instant and scheduled meetings
 - **Schedule**: topic, description, date, time and duration. Stored in UTC, shown in local time under Upcoming, with a **Start** button.
 - **Meeting room**: pre-join preview with mic and camera toggles, your own webcam via `getUserMedia`, everyone else as avatar tiles, a Zoom bottom toolbar, a participants panel, and the live roster (joins, leaves, mute and camera state) over a FastAPI WebSocket
 - **Host controls (bonus)**: Mute All, Remove participant (they can't rejoin under the same name), End Meeting for All
+- **Meetings end on their own** once everyone has left (after a 30-second grace period, so a page refresh doesn't end them)
 - **Responsive (bonus)**: works at phone width; the participants panel becomes a full-screen sheet
 - **No auth**: one seeded default user is always "logged in" and hosts every meeting they create
 
@@ -191,6 +192,7 @@ The first message must be `join`. The server applies the same rules as the REST 
 
 ## Design decisions and trade-offs
 
+- **Empty meetings end after a grace period.** When the last connection closes, a background task waits `EMPTY_MEETING_GRACE_SECONDS` (30 s) and sets `ended_at` only if the room is still empty. Ending immediately would end the meeting on every page refresh.
 - **The live roster is in memory** (`realtime.py`), because WebSocket connections only exist in this server process. The `participants` table is the durable attendance log. Running several server processes would need shared state, for example Redis pub/sub.
 - **The host is whoever joins with `user_id == meeting.host_id`.** That trusts the client, which is acceptable only because the assignment has no auth.
 - **Removed people are blocked by display name** (case-insensitive). Guests have no accounts, so the name is the only identity available; someone could rejoin under a different name.
