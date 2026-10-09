@@ -6,8 +6,10 @@ import { useState } from "react";
 import Avatar from "@/components/ui/Avatar";
 import type { User } from "@/lib/types";
 
-/** Zoom Workplace top bar: logo, search, notifications and the profile menu (placeholders: no auth) */
-export default function TopNav({ user }: { user: User | null }) {
+/** Zoom Workplace top bar: logo, search, notifications and the profile menu */
+type TopNavProps = { user: User | null; onSignOut: () => void };
+
+export default function TopNav({ user, onSignOut }: TopNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -59,7 +61,7 @@ export default function TopNav({ user }: { user: User | null }) {
               <div className="border-t border-zoom-border pt-2">
                 <MenuItem icon={<UserIcon className="h-4 w-4" />} label="Profile" />
                 <MenuItem icon={<Settings className="h-4 w-4" />} label="Settings" />
-                <MenuItem icon={<LogOut className="h-4 w-4" />} label="Sign out" />
+                <MenuItem icon={<LogOut className="h-4 w-4" />} label="Sign out" onClick={onSignOut} />
               </div>
             </div>
           )}
@@ -69,10 +71,15 @@ export default function TopNav({ user }: { user: User | null }) {
   );
 }
 
-// Placeholder menu entries: there is no auth or profile page in this app
-function MenuItem({ icon, label }: { icon: React.ReactNode; label: string }) {
+// Profile and Settings are placeholders; Sign out works
+type MenuItemProps = { icon: React.ReactNode; label: string; onClick?: () => void };
+
+function MenuItem({ icon, label, onClick }: MenuItemProps) {
   return (
-    <button className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-white/5">
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-white/5"
+    >
       {icon}
       {label}
     </button>

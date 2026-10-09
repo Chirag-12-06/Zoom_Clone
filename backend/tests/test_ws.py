@@ -1,12 +1,21 @@
+import time
+
+import jwt
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
+from app.auth import create_access_token
 from app.models import Meeting, Participant, utcnow
 
 
 @pytest.fixture
 def meeting(client):
     return client.post("/api/meetings/instant").json()
+
+
+def host_token():
+    """A login token for the seeded demo user (id 1), who owns the meetings the tests create."""
+    return create_access_token(1)
 
 
 def join_message(meeting, name="Asha", **extra):
@@ -32,14 +41,27 @@ def test_join_gets_welcome_with_self_in_roster(client, meeting, db_session):
     assert row.display_name == "Asha" and row.left_at is not None
 
 
-def test_host_is_recognised_by_user_id(client, meeting):
-    with client.websocket_connect(ws_url(meeting)) as ws:
-        ws.send_json(join_message(meeting, name="Chirag", user_id=1))
-        assert ws.receive_json()["is_host"] is True
+def test_host_is_recognised_by_their_login_token(client, meeting, db_session):
+    other = client.post(
+        "/api/auth/signup", json={"name": "Ravi", "email": "ravi@example.com", "password": "password123"}
+    ).json()
+    forged = jwt.encode({"sub": "1", "exp": time.time() + 60}, "not-the-secret", algorithm="HS256")
 
-    with client.websocket_connect(ws_url(meeting)) as ws:
-        ws.send_json(join_message(meeting, user_id=999))
-        assert ws.receive_json()["is_host"] is False
+    cases = [
+        (host_token(), True),  # the meeting's owner
+        (other["access_token"], False),  # logged in, but someone else's meeting
+        (forged, False),  # claims to be user 1, but the signature is wrong
+        (None, False),  # guest
+    ]
+    for token, expected_host in cases:
+        with client.websocket_connect(ws_url(meeting)) as ws:
+            ws.send_json(join_message(meeting, name="Someone", token=token))
+            welcome = ws.receive_json()
+            assert welcome["is_host"] is expected_host
+
+    # Logged-in people are linked to their account in the attendance log; guests aren't
+    rows = db_session.query(Participant).order_by(Participant.id).all()
+    assert [r.user_id for r in rows] == [1, other["user"]["id"], None, None]
 
 
 def test_first_join_starts_scheduled_meeting(client, db_session):
@@ -111,7 +133,7 @@ def test_unknown_and_ended_meetings_are_rejected(client, meeting, db_session):
 
 def join_pair(client, meeting, host, guest):
     """Host and one guest in the meeting; returns once both have drained their join messages."""
-    host.send_json(join_message(meeting, name="Chirag", user_id=1))
+    host.send_json(join_message(meeting, name="Chirag", token=host_token()))
     host.receive_json()  # welcome
     guest.send_json(join_message(meeting, name="Asha"))
     guest_welcome = guest.receive_json()
@@ -193,7 +215,7 @@ def test_remove_rejects_bad_targets_and_guests(client, meeting):
 
 def join_trio(meeting, host, asha, ravi):
     """Host, Asha and Ravi in the meeting with all join messages drained; returns (asha_id, ravi_id)."""
-    host.send_json(join_message(meeting, name="Chirag", user_id=1))
+    host.send_json(join_message(meeting, name="Chirag", token=host_token()))
     host.receive_json()  # welcome
     asha.send_json(join_message(meeting, name="Asha"))
     asha_id = asha.receive_json()["self_id"]
@@ -257,14 +279,14 @@ def test_second_host_connection_replaces_the_first(client, meeting):
     url = ws_url(meeting)
     with client.websocket_connect(url) as guest:
         with client.websocket_connect(url) as old_host:
-            old_host.send_json(join_message(meeting, name="Chirag", user_id=1))
+            old_host.send_json(join_message(meeting, name="Chirag", token=host_token()))
             old_id = old_host.receive_json()["self_id"]
             guest.send_json(join_message(meeting, name="Asha"))
             guest.receive_json()  # welcome
             old_host.receive_json()  # Asha joined
 
             with client.websocket_connect(url) as new_host:
-                new_host.send_json(join_message(meeting, name="Chirag", user_id=1))
+                new_host.send_json(join_message(meeting, name="Chirag", token=host_token()))
 
                 assert old_host.receive_json() == {"type": "replaced"}
                 with pytest.raises(WebSocketDisconnect) as closed:
@@ -291,7 +313,7 @@ def test_guests_never_replace_the_host(client, meeting):
     with client.websocket_connect(url) as host, client.websocket_connect(url) as guest:
         join_pair(client, meeting, host, guest)
         with client.websocket_connect(url) as another:
-            another.send_json(join_message(meeting, name="Ravi", user_id=999))  # wrong id: a guest
+            another.send_json(join_message(meeting, name="Ravi"))  # no token: a guest
             assert another.receive_json()["is_host"] is False
             assert host.receive_json()["type"] == "participant_joined"  # host still connected
 
@@ -334,10 +356,10 @@ def test_rejoining_within_the_grace_period_keeps_it_open(client, meeting, db_ses
 
     monkeypatch.setattr(ws, "EMPTY_MEETING_GRACE_SECONDS", 0.5)
     with client.websocket_connect(ws_url(meeting)) as first:  # e.g. the page before a refresh
-        first.send_json(join_message(meeting, name="Chirag", user_id=1))
+        first.send_json(join_message(meeting, name="Chirag", token=host_token()))
         first.receive_json()
     with client.websocket_connect(ws_url(meeting)) as again:  # ...and after it
-        again.send_json(join_message(meeting, name="Chirag", user_id=1))
+        again.send_json(join_message(meeting, name="Chirag", token=host_token()))
         assert again.receive_json()["type"] == "welcome"
         assert not wait_until(lambda: ended_at(db_session, meeting) is not None, timeout=1.0)
 

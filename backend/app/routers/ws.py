@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
+from app.auth import user_id_from_token
 from app.database import get_db
 from app.models import Meeting, Participant, utcnow
 from app.realtime import Connection, manager
@@ -170,11 +171,13 @@ async def meeting_socket(websocket: WebSocket, code: str, db: Session = Depends(
         await reject(websocket, "You were removed from this meeting")
         return
 
-    # 2. Record the attendance and start the meeting if this is the first person in
-    is_host = join.user_id is not None and join.user_id == meeting.host_id
+    # 2. Record the attendance and start the meeting if this is the first person in.
+    # The host is whoever proves (with a valid login token) that they own the meeting.
+    user_id = user_id_from_token(join.token) if join.token else None
+    is_host = user_id is not None and user_id == meeting.host_id
     participant = Participant(
         meeting_id=meeting.id,
-        user_id=join.user_id if is_host else None,
+        user_id=user_id,  # NULL for guests
         display_name=join.display_name,
         is_host=is_host,
     )

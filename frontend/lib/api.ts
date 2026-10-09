@@ -1,3 +1,4 @@
+import { getToken } from "./auth";
 import type { Meeting, MeetingPublic, RecentMeeting, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -12,9 +13,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      // Send the login token when we have one; guest-only pages simply don't
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!response.ok) {
     // FastAPI puts error messages in "detail"
@@ -53,4 +60,15 @@ export const checkJoin = (code: string, passcode: string, displayName: string) =
   request<MeetingPublic>(`/api/meetings/${code}/join`, {
     method: "POST",
     body: JSON.stringify({ passcode, display_name: displayName }),
+  });
+
+export type AuthResponse = { access_token: string; token_type: "bearer"; user: User };
+
+export const login = (email: string, password: string) =>
+  request<AuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+
+export const signup = (name: string, email: string, password: string) =>
+  request<AuthResponse>("/api/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ name, email, password }),
   });

@@ -9,7 +9,8 @@ import MeetingsCard from "@/components/dashboard/MeetingsCard";
 import NavRail from "@/components/dashboard/NavRail";
 import ScheduleModal from "@/components/dashboard/ScheduleModal";
 import TopNav from "@/components/dashboard/TopNav";
-import { createInstantMeeting, getMe, getRecentMeetings, getUpcomingMeetings } from "@/lib/api";
+import { ApiError, createInstantMeeting, getMe, getRecentMeetings, getUpcomingMeetings } from "@/lib/api";
+import { clearToken, getToken } from "@/lib/auth";
 import { roomUrl } from "@/lib/meeting-link";
 import type { Meeting, RecentMeeting, User } from "@/lib/types";
 
@@ -24,6 +25,11 @@ export default function DashboardPage() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
   useEffect(() => {
+    // The dashboard is for logged-in users; guests can still use /join and invite links
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
     // Fetch all three in parallel
     Promise.all([getMe(), getUpcomingMeetings(), getRecentMeetings()])
       .then(([me, upcomingMeetings, recentMeetings]) => {
@@ -31,16 +37,29 @@ export default function DashboardPage() {
         setUpcoming(upcomingMeetings);
         setRecent(recentMeetings);
       })
-      .catch(() => setError("Can't reach the server. Is the backend running?"))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          // Token expired or invalid: log in again
+          clearToken();
+          router.replace("/login");
+        } else {
+          setError("Can't reach the server. Is the backend running?");
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
+
+  function signOut() {
+    clearToken();
+    router.replace("/login");
+  }
 
   async function handleNewMeeting() {
     if (creating) return; // ignore double clicks
     setCreating(true);
     try {
       const meeting = await createInstantMeeting();
-      router.push(roomUrl(meeting.code, meeting.passcode, { host: true }));
+      router.push(roomUrl(meeting.code, meeting.passcode));
     } catch {
       setError("Couldn't start a meeting. Please try again.");
       setCreating(false);
@@ -50,7 +69,7 @@ export default function DashboardPage() {
   return (
     // Zoom Workplace layout: top bar, left rail, and the home screen in a rounded panel
     <div className="flex h-dvh flex-col bg-zoom-chrome">
-      <TopNav user={user} />
+      <TopNav user={user} onSignOut={signOut} />
 
       <div className="flex min-h-0 flex-1">
         <NavRail />
