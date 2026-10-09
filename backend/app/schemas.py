@@ -113,6 +113,8 @@ class JoinMessage(JoinRequest):
     """First message a client sends on the meeting WebSocket."""
 
     type: Literal["join"]
-    user_id: int | None = None  # sent only by the host; matched against meeting.host_id
+    # Login token, if the person is logged in. Browsers can't add headers to a WebSocket
+    # connection, so it travels in this first message. Guests send none.
+    token: str | None = None
     audio: bool = True
     video: bool = True
