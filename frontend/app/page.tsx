@@ -59,7 +59,7 @@ export default function DashboardPage() {
     setCreating(true);
     try {
       const meeting = await createInstantMeeting();
-      router.push(roomUrl(meeting.code, meeting.passcode, { host: true }));
+      router.push(roomUrl(meeting.code, meeting.passcode));
     } catch {
       setError("Couldn't start a meeting. Please try again.");
       setCreating(false);

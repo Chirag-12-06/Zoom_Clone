@@ -1,12 +1,10 @@
 type RoomOptions = {
-  host?: boolean; // the person who started the meeting from the dashboard
   name?: string; // display name entered on the join screen
 };
 
 /** URL of the meeting room, e.g. /meeting/84213976502?pwd=Ab12Cd&name=Asha */
 export function roomUrl(code: string, passcode: string, options: RoomOptions = {}): string {
   const params = new URLSearchParams({ pwd: passcode });
-  if (options.host) params.set("host", "1");
   if (options.name) params.set("name", options.name);
   return `/meeting/${code}?${params}`;
 }
@@ -34,28 +32,4 @@ export function parseMeetingInput(input: string): { code: string; passcode: stri
 
   const digits = input.replace(/[\s-]/g, "");
   return /^\d{11}$/.test(digits) ? { code: digits, passcode: "" } : null;
-}
-
-// The host's tab remembers it's the host, so host=1 can be removed from the address bar:
-// a copied room URL then doesn't make someone else the host, but a refresh still works.
-// sessionStorage belongs to one tab and survives reloads. (Still trust-based: there's no auth.)
-const hostKey = (code: string) => `zoom-clone:host:${code}`;
-
-/** Returns false if storage is blocked (e.g. strict privacy mode); then host=1 stays in the URL. */
-export function rememberHost(code: string): boolean {
-  try {
-    sessionStorage.setItem(hostKey(code), "1");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function isRememberedHost(code: string): boolean {
-  if (typeof window === "undefined") return false; // server render
-  try {
-    return sessionStorage.getItem(hostKey(code)) === "1";
-  } catch {
-    return false;
-  }
 }

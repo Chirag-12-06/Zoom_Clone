@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { ApiError, checkJoin } from "@/lib/api";
+import { ApiError, checkJoin, getMe } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import { parseMeetingInput, roomUrl } from "@/lib/meeting-link";
 
 // Turn the backend's status codes into messages people understand
@@ -25,6 +26,14 @@ export default function JoinForm({ initialCode = "", initialPasscode = "" }: Joi
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    // Logged-in users get their account name filled in (still editable); guests type one
+    if (!getToken()) return;
+    getMe()
+      .then((user) => setName((current) => current || user.name))
+      .catch(() => {});
+  }, []);
 
   function handleMeetingInputChange(value: string) {
     setMeetingInput(value);

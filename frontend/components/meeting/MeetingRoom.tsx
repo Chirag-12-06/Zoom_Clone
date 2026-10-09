@@ -13,22 +13,21 @@ import VideoGrid from "@/components/meeting/VideoGrid";
 import { useLocalMedia } from "@/hooks/useLocalMedia";
 import { useMeetingSocket } from "@/hooks/useMeetingSocket";
 import { ApiError, getMe, getMeeting } from "@/lib/api";
-import { isRememberedHost, rememberHost } from "@/lib/meeting-link";
+import { getToken } from "@/lib/auth";
 import type { MeetingPublic, Participant } from "@/lib/types";
 
 type MeetingRoomProps = {
   code: string;
   passcode: string;
-  hostInUrl: boolean; // ?host=1, set by the dashboard's New meeting / Start buttons
   displayName: string;
 };
 
-export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: MeetingRoomProps) {
+export default function MeetingRoom({ code, passcode, displayName }: MeetingRoomProps) {
   const router = useRouter();
-  // Host if the URL says so, or if this tab already came in as host (e.g. after a refresh).
-  // Reading sessionStorage here is safe for hydration: the first render is "Loading meeting…"
+  // Logged-in users send their token when joining; the server decides who is the host.
+  // Reading localStorage here is safe for hydration: the first render is "Loading meeting…"
   // either way, so server and browser HTML match.
-  const [isHost] = useState(() => hostInUrl || isRememberedHost(code));
+  const [token] = useState(getToken);
   const media = useLocalMedia();
   const stopMedia = media.stop;
   const [meeting, setMeeting] = useState<MeetingPublic | null>(null);
@@ -37,16 +36,14 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
   const [joined, setJoined] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [userId, setUserId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const socket = useMeetingSocket({
-    // The host must wait for their user id: it's what makes the server treat them as host
-    enabled: joined && (!isHost || userId !== null),
+    enabled: joined,
     code,
     passcode,
     displayName: name.trim(),
-    userId,
+    token,
     audio: media.audioOn,
     video: media.videoOn,
     // The server already marked us muted for everyone; just turn the real mic off
@@ -68,15 +65,6 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
   }, [notice]);
 
   useEffect(() => {
-    // Remember host status in this tab, then take host=1 out of the address bar so that
-    // copying the URL can't make someone else the host
-    if (!hostInUrl || !rememberHost(code)) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete("host");
-    window.history.replaceState(null, "", url);
-  }, [hostInUrl, code]);
-
-  useEffect(() => {
     getMeeting(code)
       .then(setMeeting)
       .catch((err) =>
@@ -87,13 +75,13 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
   }, [code]);
 
   useEffect(() => {
-    if (!isHost) return;
-    getMe().then((user) => {
-      setUserId(user.id);
-      // The host arrives from the dashboard without a name in the URL: use their account name
-      if (!displayName) setName(user.name);
-    });
-  }, [isHost, displayName]);
+    // Logged in and no name from the join form: start with the account name (still editable).
+    // If the token has expired this just fails quietly and the person joins as a guest.
+    if (!token || displayName) return;
+    getMe()
+      .then((user) => setName(user.name))
+      .catch(() => {});
+  }, [token, displayName]);
 
   function leave() {
     media.stop();
@@ -172,7 +160,7 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
           {
             id: selfId,
             display_name: name.trim(),
-            is_host: isHost,
+            is_host: socket.isHost,
             audio: media.audioOn,
             video: media.videoOn,
           },

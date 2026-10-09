@@ -22,7 +22,7 @@ export default function UpcomingMeetings({ meetings }: { meetings: Meeting[] }) 
               <p className="text-xs text-zoom-muted">Meeting ID: {formatMeetingCode(meeting.code)}</p>
             </div>
             <Link
-              href={roomUrl(meeting.code, meeting.passcode, { host: true })}
+              href={roomUrl(meeting.code, meeting.passcode)}
               className="rounded-lg bg-zoom-blue px-4 py-1.5 text-sm font-medium hover:bg-zoom-blue-dark"
             >
               Start

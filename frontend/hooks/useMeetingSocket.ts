@@ -10,7 +10,7 @@ type Options = {
   code: string;
   passcode: string;
   displayName: string;
-  userId: number | null; // only the host sends this
+  token: string | null; // login token if logged in; the server decides who is host
   audio: boolean;
   video: boolean;
   onForceMute: () => void; // called when the host mutes everyone
@@ -18,7 +18,7 @@ type Options = {
 
 /** Connects to the meeting WebSocket and keeps the live participant list in state. */
 export function useMeetingSocket(options: Options) {
-  const { enabled, code, passcode, displayName, userId, audio, video, onForceMute } = options;
+  const { enabled, code, passcode, displayName, token, audio, video, onForceMute } = options;
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [selfId, setSelfId] = useState<number | null>(null);
   const [isHost, setIsHost] = useState(false);
@@ -59,7 +59,7 @@ export function useMeetingSocket(options: Options) {
           type: "join",
           display_name: displayName,
           passcode,
-          user_id: userId,
+          token,
           ...mediaRef.current,
         }),
       );
@@ -113,7 +113,7 @@ export function useMeetingSocket(options: Options) {
       socket.close();
       socketRef.current = null;
     };
-  }, [enabled, code, passcode, displayName, userId]);
+  }, [enabled, code, passcode, displayName, token]);
 
   function send(message: object) {
     const socket = socketRef.current;
