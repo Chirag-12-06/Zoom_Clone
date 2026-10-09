@@ -1,6 +1,6 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -105,6 +105,17 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
     leave();
   }
 
+  // Host actions, shared by the participants panel and the video tiles
+  function muteParticipant(participant: Participant) {
+    socket.muteParticipant(participant.id);
+  }
+
+  function removeParticipant(participant: Participant) {
+    if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
+      socket.removeParticipant(participant.id);
+    }
+  }
+
   const fatalError =
     error ??
     socket.error ??
@@ -114,7 +125,7 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
     (meeting?.has_ended ? "This meeting has ended." : null);
   if (fatalError) {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-meeting-bg p-4 text-white">
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-zoom-bg p-4 text-white">
         <p className="text-lg">{fatalError}</p>
         <Link
           href="/"
@@ -128,7 +139,7 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
 
   if (!meeting) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-meeting-bg text-gray-400">
+      <main className="flex min-h-dvh items-center justify-center bg-zoom-bg text-zoom-muted">
         Loading meeting…
       </main>
     );
@@ -171,23 +182,7 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
         );
 
   return (
-    <div className="flex h-dvh flex-col bg-meeting-bg text-white">
-      <header className="relative flex h-10 shrink-0 items-center gap-2 px-4 text-sm">
-        <button
-          onClick={() => setInfoOpen((open) => !open)}
-          aria-label="Meeting information"
-          className="rounded p-1 text-green-500 hover:bg-white/10"
-        >
-          <Info className="h-4 w-4" />
-        </button>
-        <span className="truncate text-gray-300">{meeting.title}</span>
-        {infoOpen && (
-          <div className="absolute left-4 top-10 z-30">
-            <MeetingInfo meeting={meeting} passcode={passcode} />
-          </div>
-        )}
-      </header>
-
+    <div className="flex h-dvh flex-col bg-zoom-bg text-white">
       {socket.disconnected && (
         <p className="bg-red-600 px-4 py-1.5 text-center text-sm">
           Connection lost.{" "}
@@ -196,11 +191,37 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
           </button>
         </p>
       )}
-      {notice && <p className="bg-[#2b2b2b] px-4 py-1.5 text-center text-sm">{notice}</p>}
+      {notice && <p className="bg-zoom-surface-2 px-4 py-1.5 text-center text-sm">{notice}</p>}
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
-          <VideoGrid participants={participants} selfId={selfId} selfStream={media.stream} />
+        <div className="relative min-w-0 flex-1">
+          {/* Zoom's floating top-right pill: the green shield opens the meeting information */}
+          <div className="absolute right-3 top-3 z-20 rounded-xl bg-black/70 p-1">
+            <button
+              onClick={() => setInfoOpen((open) => !open)}
+              aria-label="Meeting information"
+              className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-white/10"
+            >
+              <ShieldCheck className="h-5 w-5 text-green-500" />
+              <span className="hidden max-w-56 truncate text-gray-200 sm:block">{meeting.title}</span>
+            </button>
+          </div>
+          {infoOpen && (
+            <div className="absolute right-3 top-16 z-30 w-[calc(100%-1.5rem)] max-w-md">
+              <MeetingInfo meeting={meeting} passcode={passcode} />
+            </div>
+          )}
+          {/* Top padding keeps the pill from covering the top-right tile's host buttons */}
+          <div className="h-full pt-12">
+            <VideoGrid
+              participants={participants}
+              selfId={selfId}
+              selfStream={media.stream}
+              isHost={socket.isHost}
+              onMute={muteParticipant}
+              onRemove={removeParticipant}
+            />
+          </div>
         </div>
         {participantsOpen && (
           <ParticipantsPanel
@@ -209,12 +230,8 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
             isHost={socket.isHost}
             onClose={() => setParticipantsOpen(false)}
             onMuteAll={socket.muteAll}
-            onMute={(participant) => socket.muteParticipant(participant.id)}
-            onRemove={(participant) => {
-              if (window.confirm(`Remove ${participant.display_name} from the meeting?`)) {
-                socket.removeParticipant(participant.id);
-              }
-            }}
+            onMute={muteParticipant}
+            onRemove={removeParticipant}
           />
         )}
       </div>
@@ -231,6 +248,7 @@ export default function MeetingRoom({ code, passcode, hostInUrl, displayName }: 
         onLeave={leave}
         isHost={socket.isHost}
         onEndMeeting={endForAll}
+        onMuteAll={socket.muteAll}
       />
     </div>
   );

@@ -14,9 +14,13 @@ type VideoGridProps = {
   participants: Participant[];
   selfId: number;
   selfStream: MediaStream | null;
+  isHost: boolean; // the host gets Mute / Remove on everyone else's tile
+  onMute: (participant: Participant) => void;
+  onRemove: (participant: Participant) => void;
 };
 
-export default function VideoGrid({ participants, selfId, selfStream }: VideoGridProps) {
+export default function VideoGrid(props: VideoGridProps) {
+  const { participants, selfId, selfStream, isHost } = props;
   return (
     // Centred with my-auto/mx-auto rather than items-center: when the tiles are taller than
     // the screen, items-center would push the first row above the top where it can't be scrolled to
@@ -30,6 +34,11 @@ export default function VideoGrid({ participants, selfId, selfStream }: VideoGri
               participant={participant}
               stream={isSelf ? selfStream : null}
               isSelf={isSelf}
+              hostActions={
+                isHost && !isSelf
+                  ? { onMute: () => props.onMute(participant), onRemove: () => props.onRemove(participant) }
+                  : undefined
+              }
             />
           );
         })}

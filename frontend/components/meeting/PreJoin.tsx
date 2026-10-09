@@ -24,7 +24,7 @@ export default function PreJoin(props: PreJoinProps) {
   const { meeting, stream, mediaError, audioOn, videoOn, name } = props;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-meeting-bg p-4 text-white lg:flex-row lg:gap-12">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-zoom-bg p-4 text-white lg:flex-row lg:gap-12">
       <div className="flex w-full max-w-xl flex-col gap-4">
         <VideoTile
           participant={{ id: 0, display_name: name || "You", is_host: false, audio: audioOn, video: videoOn }}
@@ -68,13 +68,13 @@ export default function PreJoin(props: PreJoinProps) {
             value={name}
             onChange={(e) => props.onNameChange(e.target.value)}
             maxLength={50}
-            className="rounded-lg border border-gray-600 bg-[#2b2b2b] px-3 py-2 text-white outline-none focus:border-zoom-blue"
+            className="rounded-lg border border-zoom-border bg-zoom-surface-2 px-3 py-2 text-white outline-none focus:border-zoom-blue"
           />
         </label>
         <button
           type="submit"
           disabled={!name.trim()}
-          className="rounded-lg bg-zoom-blue py-2.5 font-semibold hover:bg-zoom-blue-dark disabled:bg-gray-600"
+          className="rounded-lg bg-zoom-blue py-2.5 font-semibold hover:bg-zoom-blue-dark disabled:bg-zoom-surface-2 disabled:text-zoom-muted"
         >
           Join
         </button>
@@ -103,7 +103,7 @@ function RoundToggle({ on, disabled, label, onClick, children }: RoundToggleProp
       onClick={onClick}
       disabled={disabled}
       className={`flex h-12 w-12 items-center justify-center rounded-full disabled:opacity-40 ${
-        on ? "bg-[#3a3a3a] hover:bg-[#4a4a4a]" : "bg-red-600 hover:bg-red-700"
+        on ? "bg-zoom-surface-2 hover:bg-white/15" : "bg-red-600 hover:bg-red-700"
       }`}
     >
       {children}

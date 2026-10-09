@@ -24,18 +24,18 @@ export default function MeetingInfo({ meeting, passcode }: MeetingInfoProps) {
   }
 
   return (
-    <div className="w-full max-w-md rounded-xl bg-white p-6 text-gray-900 shadow-xl">
+    <div className="w-full max-w-md rounded-xl border border-zoom-border bg-zoom-surface p-6 text-white shadow-2xl">
       <h2 className="text-lg font-semibold">{meeting.title}</h2>
 
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="text-gray-500">Meeting ID</dt>
+        <dt className="text-zoom-muted">Meeting ID</dt>
         <dd className="font-medium">{formatMeetingCode(meeting.code)}</dd>
-        <dt className="text-gray-500">Host</dt>
+        <dt className="text-zoom-muted">Host</dt>
         <dd className="font-medium">{meeting.host_name}</dd>
-        <dt className="text-gray-500">Passcode</dt>
+        <dt className="text-zoom-muted">Passcode</dt>
         <dd className="font-medium">{passcode}</dd>
-        <dt className="text-gray-500">Invite link</dt>
-        <dd className="truncate text-zoom-blue">{link}</dd>
+        <dt className="text-zoom-muted">Invite link</dt>
+        <dd className="truncate text-[#4b8bff]">{link}</dd>
       </dl>
 
       <button

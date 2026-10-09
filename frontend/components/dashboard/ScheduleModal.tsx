@@ -81,7 +81,7 @@ export default function ScheduleModal({ user, onClose, onScheduled }: ScheduleMo
           />
           <button
             onClick={onClose}
-            className="rounded-lg bg-white px-6 py-2 text-sm font-medium text-gray-900"
+            className="rounded-lg bg-zoom-surface-2 px-6 py-2 text-sm font-medium hover:bg-white/15"
           >
             Done
           </button>
@@ -91,13 +91,16 @@ export default function ScheduleModal({ user, onClose, onScheduled }: ScheduleMo
   }
 
   const inputClass =
-    "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue";
-  const labelClass = "flex flex-col gap-1 text-sm font-medium text-gray-700";
+    "w-full rounded-lg border border-zoom-border bg-zoom-surface-2 px-3 py-2 text-sm text-white outline-none [color-scheme:dark] focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue";
+  const labelClass = "flex flex-col gap-1 text-sm font-medium text-gray-200";
 
   return (
     <Modal onClose={onClose}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-xl bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-gray-900">Schedule meeting</h2>
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4 rounded-xl border border-zoom-border bg-zoom-surface p-6 shadow-2xl"
+      >
+        <h2 className="text-lg font-semibold">Schedule meeting</h2>
 
         <label className={labelClass}>
           Topic
@@ -160,20 +163,20 @@ export default function ScheduleModal({ user, onClose, onScheduled }: ScheduleMo
           </select>
         </label>
 
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-200 hover:bg-white/10"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting || !title.trim()}
-            className="rounded-lg bg-zoom-blue px-5 py-2 text-sm font-semibold text-white hover:bg-zoom-blue-dark disabled:bg-gray-300"
+            className="rounded-lg bg-zoom-blue px-5 py-2 text-sm font-semibold text-white hover:bg-zoom-blue-dark disabled:bg-zoom-surface-2 disabled:text-zoom-muted"
           >
             {submitting ? "Saving…" : "Save"}
           </button>
