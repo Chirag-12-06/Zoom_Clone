@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { formatLongDate, formatTime } from "@/lib/format";
 
+/** The big centred clock at the top of Zoom's home screen */
 export default function ClockCard() {
   const [now, setNow] = useState(() => new Date());
 
@@ -13,12 +14,12 @@ export default function ClockCard() {
   }, []);
 
   return (
-    <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 px-6 py-8 text-white">
+    <div className="text-center">
       {/* The server-rendered time can differ from the browser's by a second; tell React that's expected */}
-      <p className="text-5xl font-semibold" suppressHydrationWarning>
+      <p className="text-5xl font-bold tracking-tight sm:text-6xl" suppressHydrationWarning>
         {formatTime(now)}
       </p>
-      <p className="mt-1 text-sm text-slate-300" suppressHydrationWarning>
+      <p className="mt-2 text-zoom-muted sm:text-lg" suppressHydrationWarning>
         {formatLongDate(now)}
       </p>
     </div>

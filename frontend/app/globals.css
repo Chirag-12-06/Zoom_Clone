@@ -1,14 +1,20 @@
 @import "tailwindcss";
 
+/* Zoom Workplace dark theme (sampled from the current Zoom app) */
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --color-zoom-blue: #0b5cff;
   --color-zoom-blue-dark: #0e49cc;
-  --color-zoom-orange: #ff742e;
-  --color-meeting-bg: #1a1a1a;
-  --color-toolbar-bg: #242424;
+  --color-zoom-orange: #ff6a1a;
+  --color-zoom-chrome: #232427; /* top bar and side rail */
+  --color-zoom-bg: #131619; /* main content and meeting background */
+  --color-zoom-surface: #1c1f23; /* cards, panels, modals */
+  --color-zoom-surface-2: #26292e; /* card headers, inputs, hover */
+  --color-zoom-border: #33373d;
+  --color-zoom-muted: #9ba1a8; /* secondary text */
+  --color-zoom-tile: #232629; /* video tiles */
 }
 
 body {
-  @apply bg-white text-gray-900 font-sans;
+  @apply bg-zoom-bg font-sans text-white;
 }
