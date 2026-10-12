@@ -18,12 +18,23 @@ type Options = {
 
 /** Connects to the meeting WebSocket and keeps the live participant list in state. */
 export function useMeetingSocket(options: Options) {
-  const { enabled, code, passcode, displayName, token, audio, video, onForceMute } = options;
+  const {
+    enabled,
+    code,
+    passcode,
+    displayName,
+    token,
+    audio,
+    video,
+    onForceMute,
+  } = options;
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [selfId, setSelfId] = useState<number | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [endedReason, setEndedReason] = useState<"removed" | "ended" | "replaced" | null>(null);
+  const [endedReason, setEndedReason] = useState<
+    "removed" | "ended" | "replaced" | null
+  >(null);
   const [disconnected, setDisconnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -79,11 +90,15 @@ export function useMeetingSocket(options: Options) {
           break;
         case "participant_updated":
           setParticipants((list) =>
-            list.map((p) => (p.id === message.participant.id ? message.participant : p)),
+            list.map((p) =>
+              p.id === message.participant.id ? message.participant : p,
+            ),
           );
           break;
         case "participant_left":
-          setParticipants((list) => list.filter((p) => p.id !== message.participant_id));
+          setParticipants((list) =>
+            list.filter((p) => p.id !== message.participant_id),
+          );
           break;
         case "force_mute":
           onForceMuteRef.current();
@@ -117,7 +132,8 @@ export function useMeetingSocket(options: Options) {
 
   function send(message: object) {
     const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+    if (socket?.readyState === WebSocket.OPEN)
+      socket.send(JSON.stringify(message));
   }
 
   return {

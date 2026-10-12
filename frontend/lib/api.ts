@@ -26,22 +26,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     // FastAPI puts error messages in "detail"
     const body = await response.json().catch(() => null);
-    const detail = typeof body?.detail === "string" ? body.detail : response.statusText;
+    const detail =
+      typeof body?.detail === "string" ? body.detail : response.statusText;
     throw new ApiError(response.status, detail);
   }
   return response.json();
 }
 
 /** http://localhost:8000 -> ws://localhost:8000/ws/meetings/<code> (https becomes wss) */
-export const meetingSocketUrl = (code: string) => `${API_URL.replace(/^http/, "ws")}/ws/meetings/${code}`;
+export const meetingSocketUrl = (code: string) =>
+  `${API_URL.replace(/^http/, "ws")}/ws/meetings/${code}`;
 
 export const getMe = () => request<User>("/api/me");
 
-export const getUpcomingMeetings = () => request<Meeting[]>("/api/meetings/upcoming");
+export const getUpcomingMeetings = () =>
+  request<Meeting[]>("/api/meetings/upcoming");
 
-export const getRecentMeetings = () => request<RecentMeeting[]>("/api/meetings/recent");
+export const getRecentMeetings = () =>
+  request<RecentMeeting[]>("/api/meetings/recent");
 
-export const createInstantMeeting = () => request<Meeting>("/api/meetings/instant", { method: "POST" });
+export const createInstantMeeting = () =>
+  request<Meeting>("/api/meetings/instant", { method: "POST" });
 
 export type ScheduleMeetingBody = {
   title: string;
@@ -51,21 +56,36 @@ export type ScheduleMeetingBody = {
 };
 
 export const scheduleMeeting = (body: ScheduleMeetingBody) =>
-  request<Meeting>("/api/meetings", { method: "POST", body: JSON.stringify(body) });
+  request<Meeting>("/api/meetings", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
-export const getMeeting = (code: string) => request<MeetingPublic>(`/api/meetings/${code}`);
+export const getMeeting = (code: string) =>
+  request<MeetingPublic>(`/api/meetings/${code}`);
 
 /** Checks the meeting exists, the passcode is right and it hasn't ended. Throws ApiError otherwise. */
-export const checkJoin = (code: string, passcode: string, displayName: string) =>
+export const checkJoin = (
+  code: string,
+  passcode: string,
+  displayName: string,
+) =>
   request<MeetingPublic>(`/api/meetings/${code}/join`, {
     method: "POST",
     body: JSON.stringify({ passcode, display_name: displayName }),
   });
 
-export type AuthResponse = { access_token: string; token_type: "bearer"; user: User };
+export type AuthResponse = {
+  access_token: string;
+  token_type: "bearer";
+  user: User;
+};
 
 export const login = (email: string, password: string) =>
-  request<AuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  request<AuthResponse>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
 
 export const signup = (name: string, email: string, password: string) =>
   request<AuthResponse>("/api/auth/signup", {

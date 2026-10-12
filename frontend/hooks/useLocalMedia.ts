@@ -31,7 +31,9 @@ export function useLocalMedia() {
       })
       .catch(() => {
         if (cancelled) return;
-        setError("Camera or microphone unavailable. You can still join with your avatar.");
+        setError(
+          "Camera or microphone unavailable. You can still join with your avatar.",
+        );
         setAudioOn(false);
         setVideoOn(false);
       });

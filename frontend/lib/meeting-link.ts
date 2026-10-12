@@ -3,7 +3,11 @@ type RoomOptions = {
 };
 
 /** URL of the meeting room, e.g. /meeting/84213976502?pwd=Ab12Cd&name=Asha */
-export function roomUrl(code: string, passcode: string, options: RoomOptions = {}): string {
+export function roomUrl(
+  code: string,
+  passcode: string,
+  options: RoomOptions = {},
+): string {
   const params = new URLSearchParams({ pwd: passcode });
   if (options.name) params.set("name", options.name);
   return `/meeting/${code}?${params}`;
@@ -23,7 +27,9 @@ export function inviteLink(code: string, passcode: string): string {
  *   "http://localhost:3000/j/84213976502?pwd=Ab12Cd" -> { code, passcode }
  * Returns null if it's neither.
  */
-export function parseMeetingInput(input: string): { code: string; passcode: string } | null {
+export function parseMeetingInput(
+  input: string,
+): { code: string; passcode: string } | null {
   const link = input.match(/\/j\/(\d{11})/);
   if (link) {
     const pwd = input.match(/[?&]pwd=([^&#\s]+)/);
