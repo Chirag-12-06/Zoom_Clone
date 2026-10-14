@@ -11,7 +11,8 @@ const DURATIONS = [15, 30, 45, 60, 90, 120];
 
 // <input type="date"> and <input type="time"> work with "YYYY-MM-DD" and "HH:MM" strings in local time
 const pad = (n: number) => String(n).padStart(2, "0");
-const toDateValue = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const toDateValue = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const toTimeValue = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /** The next full half hour, e.g. 14:10 -> 14:30, 14:40 -> 15:00 */
@@ -27,7 +28,11 @@ type ScheduleModalProps = {
   onScheduled: () => void;
 };
 
-export default function ScheduleModal({ user, onClose, onScheduled }: ScheduleModalProps) {
+export default function ScheduleModal({
+  user,
+  onClose,
+  onScheduled,
+}: ScheduleModalProps) {
   const [defaultStart] = useState(nextHalfHour);
   const [title, setTitle] = useState(`${user.name}'s Zoom Meeting`);
   const [description, setDescription] = useState("");
@@ -76,7 +81,12 @@ export default function ScheduleModal({ user, onClose, onScheduled }: ScheduleMo
       <Modal onClose={onClose}>
         <div className="flex flex-col items-center gap-4">
           <MeetingInfo
-            meeting={{ code: scheduled.code, title: scheduled.title, host_name: user.name, has_ended: false }}
+            meeting={{
+              code: scheduled.code,
+              title: scheduled.title,
+              host_name: user.name,
+              has_ended: false,
+            }}
             passcode={scheduled.passcode}
           />
           <button
@@ -163,7 +173,11 @@ export default function ScheduleModal({ user, onClose, onScheduled }: ScheduleMo
           </select>
         </label>
 
-        {error && <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>}
+        {error && (
+          <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
           <button

@@ -25,7 +25,11 @@ export default function NavRail() {
   );
 }
 
-type RailButtonProps = { label: string; active?: boolean; children: React.ReactNode };
+type RailButtonProps = {
+  label: string;
+  active?: boolean;
+  children: React.ReactNode;
+};
 
 function RailButton({ label, active = false, children }: RailButtonProps) {
   return (

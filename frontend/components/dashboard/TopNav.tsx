@@ -1,6 +1,14 @@
 "use client";
 
-import { Bell, ChevronLeft, ChevronRight, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
+import {
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Search,
+  Settings,
+  User as UserIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import Avatar from "@/components/ui/Avatar";
@@ -46,7 +54,11 @@ export default function TopNav({ user, onSignOut }: TopNavProps) {
             aria-label="Profile menu"
             className="rounded-full p-0.5 hover:ring-2 hover:ring-white/20"
           >
-            {user ? <Avatar name={user.name} /> : <div className="h-8 w-8 rounded-full bg-zoom-surface-2" />}
+            {user ? (
+              <Avatar name={user.name} />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-zoom-surface-2" />
+            )}
           </button>
 
           {menuOpen && user && (
@@ -55,13 +67,25 @@ export default function TopNav({ user, onSignOut }: TopNavProps) {
                 <Avatar name={user.name} className="h-10 w-10 text-base" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{user.name}</p>
-                  <p className="truncate text-xs text-zoom-muted">{user.email}</p>
+                  <p className="truncate text-xs text-zoom-muted">
+                    {user.email}
+                  </p>
                 </div>
               </div>
               <div className="border-t border-zoom-border pt-2">
-                <MenuItem icon={<UserIcon className="h-4 w-4" />} label="Profile" />
-                <MenuItem icon={<Settings className="h-4 w-4" />} label="Settings" />
-                <MenuItem icon={<LogOut className="h-4 w-4" />} label="Sign out" onClick={onSignOut} />
+                <MenuItem
+                  icon={<UserIcon className="h-4 w-4" />}
+                  label="Profile"
+                />
+                <MenuItem
+                  icon={<Settings className="h-4 w-4" />}
+                  label="Settings"
+                />
+                <MenuItem
+                  icon={<LogOut className="h-4 w-4" />}
+                  label="Sign out"
+                  onClick={onSignOut}
+                />
               </div>
             </div>
           )}
@@ -72,7 +96,11 @@ export default function TopNav({ user, onSignOut }: TopNavProps) {
 }
 
 // Profile and Settings are placeholders; Sign out works
-type MenuItemProps = { icon: React.ReactNode; label: string; onClick?: () => void };
+type MenuItemProps = {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+};
 
 function MenuItem({ icon, label, onClick }: MenuItemProps) {
   return (

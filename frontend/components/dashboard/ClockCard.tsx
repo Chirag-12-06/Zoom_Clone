@@ -16,7 +16,10 @@ export default function ClockCard() {
   return (
     <div className="text-center">
       {/* The server-rendered time can differ from the browser's by a second; tell React that's expected */}
-      <p className="text-5xl font-bold tracking-tight sm:text-6xl" suppressHydrationWarning>
+      <p
+        className="text-5xl font-bold tracking-tight sm:text-6xl"
+        suppressHydrationWarning
+      >
         {formatTime(now)}
       </p>
       <p className="mt-2 text-zoom-muted sm:text-lg" suppressHydrationWarning>

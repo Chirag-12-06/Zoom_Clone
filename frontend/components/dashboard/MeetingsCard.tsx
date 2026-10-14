@@ -15,9 +15,18 @@ type MeetingsCardProps = {
 };
 
 /** Zoom's home-screen meetings card: today's date, Upcoming / Recent tabs and the list */
-export default function MeetingsCard({ loading, upcoming, recent, onSchedule }: MeetingsCardProps) {
+export default function MeetingsCard({
+  loading,
+  upcoming,
+  recent,
+  onSchedule,
+}: MeetingsCardProps) {
   const [tab, setTab] = useState<"upcoming" | "recent">("upcoming");
-  const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <section className="mx-auto w-full max-w-[730px] overflow-hidden rounded-xl border border-zoom-border bg-zoom-surface">
@@ -35,7 +44,10 @@ export default function MeetingsCard({ loading, upcoming, recent, onSchedule }: 
       </header>
 
       <div className="flex gap-2 border-b border-zoom-border px-4 py-3">
-        <TabButton active={tab === "upcoming"} onClick={() => setTab("upcoming")}>
+        <TabButton
+          active={tab === "upcoming"}
+          onClick={() => setTab("upcoming")}
+        >
           Upcoming meetings
         </TabButton>
         <TabButton active={tab === "recent"} onClick={() => setTab("recent")}>
@@ -52,9 +64,15 @@ export default function MeetingsCard({ loading, upcoming, recent, onSchedule }: 
           ) : (
             // Zoom's empty state: an illustration, a message and a shortcut to Schedule
             <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <Umbrella className="mb-3 h-20 w-20 text-zoom-muted/60" strokeWidth={1.2} />
+              <Umbrella
+                className="mb-3 h-20 w-20 text-zoom-muted/60"
+                strokeWidth={1.2}
+              />
               <p>No upcoming meetings</p>
-              <button onClick={onSchedule} className="flex items-center gap-1 text-zoom-blue hover:underline">
+              <button
+                onClick={onSchedule}
+                className="flex items-center gap-1 text-zoom-blue hover:underline"
+              >
                 <Plus className="h-4 w-4" /> Schedule a meeting
               </button>
             </div>
@@ -62,14 +80,20 @@ export default function MeetingsCard({ loading, upcoming, recent, onSchedule }: 
         ) : recent.length > 0 ? (
           <RecentMeetings meetings={recent} />
         ) : (
-          <p className="py-16 text-center text-sm text-zoom-muted">No recent meetings</p>
+          <p className="py-16 text-center text-sm text-zoom-muted">
+            No recent meetings
+          </p>
         )}
       </div>
     </section>
   );
 }
 
-type TabButtonProps = { active: boolean; onClick: () => void; children: React.ReactNode };
+type TabButtonProps = {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+};
 
 function TabButton({ active, onClick, children }: TabButtonProps) {
   return (
