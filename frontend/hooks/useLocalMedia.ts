@@ -63,8 +63,8 @@ export function useLocalMedia() {
     error,
     audioOn: audioOn && stream !== null,
     videoOn: videoOn && stream !== null,
-    toggleAudio: () => setAudioOn(!audioOn),
-    toggleVideo: () => setVideoOn(!videoOn),
+    toggleAudio: () => setAudioOn((prev) => !prev),
+    toggleVideo: () => setVideoOn((prev) => !prev),
     setAudio: setAudioOn,
     stop,
   };

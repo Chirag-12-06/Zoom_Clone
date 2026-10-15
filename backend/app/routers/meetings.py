@@ -23,10 +23,8 @@ router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 
 def create_meeting(db: Session, **fields) -> Meeting:
     """Insert a meeting with a random code, retrying if the code is already taken.
-
-    The UNIQUE constraint on meetings.code is what guarantees uniqueness;
-    the retry just handles the (very unlikely) collision.
-    """
+       The UNIQUE constraint on meetings.code is what guarantees uniqueness;
+       the retry just handles the (very unlikely) collision."""
     for _ in range(5):
         meeting = Meeting(code=generate_meeting_code(), passcode=generate_passcode(), **fields)
         db.add(meeting)
